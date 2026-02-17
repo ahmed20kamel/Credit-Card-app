@@ -59,6 +59,7 @@ export interface Card {
   statement_date?: number;
   payment_due_date?: number;
   minimum_payment?: number;
+  minimum_payment_percentage?: number | null;
   credit_limit?: number;
   current_balance?: number;
   created_at: string;
@@ -88,6 +89,7 @@ export interface CardCreateRequest {
   statement_date?: number | null;
   payment_due_date?: number | null;
   minimum_payment?: number | null;
+  minimum_payment_percentage?: number | null;
   credit_limit?: number | null;
   current_balance?: number | null;
 }

@@ -15,7 +15,7 @@ import PasswordStrength from '@/components/ui/PasswordStrength';
 export default function SettingsPage() {
   const router = useRouter();
   const { user, isAuthenticated, loadUser } = useAuthStore();
-  const { t, locale, setLocale, isRTL } = useTranslations();
+  const { t, locale, setLocale } = useTranslations();
 
   // Profile state
   const [fullName, setFullName] = useState('');
@@ -281,7 +281,6 @@ export default function SettingsPage() {
               type="button"
               className={`theme-option ${locale === 'en' ? 'active' : ''}`}
               onClick={() => handleLanguageChange('en')}
-              style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
             >
               <span style={{ fontSize: '1.5rem' }}>EN</span>
               <span>{t('settings.english') || 'English'}</span>
@@ -290,7 +289,6 @@ export default function SettingsPage() {
               type="button"
               className={`theme-option ${locale === 'ar' ? 'active' : ''}`}
               onClick={() => handleLanguageChange('ar')}
-              style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
             >
               <span style={{ fontSize: '1.5rem' }}>AR</span>
               <span>{t('settings.arabic') || 'Arabic'}</span>

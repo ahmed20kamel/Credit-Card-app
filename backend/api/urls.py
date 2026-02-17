@@ -19,11 +19,11 @@ def health_check(request):
     return JsonResponse({'status': 'ok'})
 
 urlpatterns = [
-    path('health', health_check, name='health'),
-    path('auth/register', register, name='register'),
-    path('auth/login', login, name='login'),
-    path('auth/refresh', refresh_token, name='refresh'),
-    path('auth/me', profile, name='profile'),
-    path('auth/change-password', change_password, name='change-password'),
+    path('health/', health_check, name='health'),
+    path('auth/register/', register, name='register'),
+    path('auth/login/', login, name='login'),
+    path('auth/refresh/', refresh_token, name='refresh'),
+    path('auth/me/', profile, name='profile'),
+    path('auth/change-password/', change_password, name='change-password'),
     path('', include(router.urls)),
 ]

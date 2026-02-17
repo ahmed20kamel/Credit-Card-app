@@ -7,23 +7,20 @@ import { cardsAPI, Card } from '@/app/api/cards';
 import { transactionsAPI, Transaction } from '@/app/api/transactions';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
+import { formatAmount, formatPercent } from '@/lib/formatNumber';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import { 
+import {
   ArrowLeft,
   Edit,
   Trash2,
   RefreshCw,
   Eye,
   EyeOff,
-  Calendar,
   CreditCard as CreditCardIcon,
   TrendingUp,
   TrendingDown,
   Receipt,
-  Wallet,
-  DollarSign,
-  AlertCircle,
   Copy,
   Check
 } from 'lucide-react';
@@ -273,9 +270,9 @@ export default function CardDetailPage() {
                     <div>
                       <p className="credit-card-label">{t('cards.cardholder')}</p>
                       <p className="credit-card-holder">
-                        {reveal && card.cardholder_name 
-                          ? card.cardholder_name 
-                          : card.card_name.split(' ').map(n => n[0]).join('') || 'CARD'}
+                        {reveal && card.cardholder_name
+                          ? card.cardholder_name
+                          : '••••'}
                       </p>
                     </div>
                     <div className="credit-card-expiry">
@@ -311,88 +308,6 @@ export default function CardDetailPage() {
                 </div>
               </div>
             </div>
-
-            {/* Credit Card Information */}
-            {isCredit && (
-              <div className="card info-card">
-                <div className="section-header">
-                  <CreditCardIcon size={20} />
-                  <h2 className="section-title">{t('cards.creditCardInfo') || 'Credit Card Information'}</h2>
-                </div>
-
-                <div className="info-grid">
-                  {card.credit_limit !== null && (
-                    <div className="info-card-item">
-                      <div className="info-card-icon">
-                        <Wallet size={20} />
-                      </div>
-                      <div className="info-card-content">
-                        <p className="info-card-label">{t('cards.creditLimit')}</p>
-                        <p className="info-card-value">{Number(card.credit_limit).toFixed(2)} {card.balance_currency}</p>
-                      </div>
-                    </div>
-                  )}
-                  {card.current_balance !== null && (
-                    <div className="info-card-item">
-                      <div className="info-card-icon info-card-icon-danger">
-                        <DollarSign size={20} />
-                      </div>
-                      <div className="info-card-content">
-                        <p className="info-card-label">{t('cards.currentBalance')}</p>
-                        <p className="info-card-value info-card-value-danger">{Number(card.current_balance).toFixed(2)} {card.balance_currency}</p>
-                      </div>
-                    </div>
-                  )}
-                  {card.available_balance !== null && (
-                    <div className="info-card-item">
-                      <div className="info-card-icon info-card-icon-success">
-                        <TrendingUp size={20} />
-                      </div>
-                      <div className="info-card-content">
-                        <p className="info-card-label">{t('cards.available')}</p>
-                        <p className="info-card-value info-card-value-success">{Number(card.available_balance).toFixed(2)} {card.balance_currency}</p>
-                      </div>
-                    </div>
-                  )}
-                  {card.minimum_payment !== null && (
-                    <div className="info-card-item">
-                      <div className="info-card-icon">
-                        <AlertCircle size={20} />
-                      </div>
-                      <div className="info-card-content">
-                        <p className="info-card-label">{t('cards.minimumPayment')}</p>
-                        <p className="info-card-value">{Number(card.minimum_payment).toFixed(2)} {card.balance_currency}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {card.credit_limit && card.current_balance !== null && (
-                  <div className="usage-section">
-                    <div className="usage-header">
-                      <span className="usage-label">{t('cards.creditUsage')}</span>
-                      <span className="usage-percentage">{usedPercentage.toFixed(1)}%</span>
-                    </div>
-                    <div className="progress-bar">
-                      <div
-                        className="progress-fill"
-                        style={{ width: `${Math.min(usedPercentage, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
-
-                {card.payment_due_date && (
-                  <div className="payment-due-card">
-                    <Calendar size={18} />
-                    <div>
-                      <p className="payment-due-label">{t('cards.paymentDue')}</p>
-                      <p className="payment-due-value">{t('cards.day')} {card.payment_due_date}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Transactions */}
             <div className="card transactions-card">
@@ -432,7 +347,7 @@ export default function CardDetailPage() {
                             <p className="transaction-merchant">{txn.merchant_name || txn.description || t('transactions.transaction')}</p>
                             <p className={`transaction-amount ${isExpense ? 'transaction-amount-expense' : 'transaction-amount-income'}`}>
                               {isExpense ? '-' : '+'}
-                              {Number(txn.amount).toFixed(2)} {txn.currency}
+                              {formatAmount(txn.amount)} {txn.currency}
                             </p>
                           </div>
                           <div className="transaction-meta">
@@ -453,51 +368,65 @@ export default function CardDetailPage() {
             </div>
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar: one unified card info + summary */}
           <div className="card-detail-sidebar">
-            {/* Quick Summary */}
             <div className="card summary-card">
               <div className="section-header">
-                <DollarSign size={20} />
-                <h3 className="section-title-small">{t('cards.quickSummary') || 'Quick Summary'}</h3>
+                <CreditCardIcon size={20} />
+                <h3 className="section-title-small">{t('cards.cardInfo') || 'Card Information'}</h3>
               </div>
               <div className="summary-list">
                 {isCredit && card.credit_limit && (
                   <div className="summary-item">
                     <p className="summary-item-label">{t('cards.creditLimit')}</p>
-                    <p className="summary-item-value">{Number(card.credit_limit).toFixed(2)} {card.balance_currency}</p>
+                    <p className="summary-item-value">{formatAmount(card.credit_limit)} {card.balance_currency}</p>
                   </div>
                 )}
                 {card.current_balance !== null && (
                   <div className="summary-item">
                     <p className="summary-item-label">{t('cards.outstanding')}</p>
-                    <p className="summary-item-value summary-item-value-danger">{Number(card.current_balance).toFixed(2)} {card.balance_currency}</p>
+                    <p className="summary-item-value summary-item-value-danger">{formatAmount(card.current_balance)} {card.balance_currency}</p>
                   </div>
                 )}
                 {card.available_balance !== null && (
                   <div className="summary-item">
                     <p className="summary-item-label">{t('cards.available')}</p>
-                    <p className="summary-item-value summary-item-value-success">{Number(card.available_balance).toFixed(2)} {card.balance_currency}</p>
+                    <p className="summary-item-value summary-item-value-success">{formatAmount(card.available_balance)} {card.balance_currency}</p>
+                  </div>
+                )}
+                {isCredit && card.credit_limit && card.current_balance !== null && (
+                  <div className="summary-item summary-item-full">
+                    <div className="usage-header">
+                      <span className="usage-label">{t('cards.creditUsage')}</span>
+                      <span className="usage-percentage">{formatPercent(usedPercentage)}</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div className="progress-fill" style={{ width: `${Math.min(usedPercentage, 100)}%` }}></div>
+                    </div>
+                  </div>
+                )}
+                {card.payment_due_date && (
+                  <div className="summary-item">
+                    <p className="summary-item-label">{t('cards.paymentDue')}</p>
+                    <p className="summary-item-value">{t('cards.day')} {card.payment_due_date}</p>
+                  </div>
+                )}
+                {card.minimum_payment != null && (
+                  <div className="summary-item">
+                    <p className="summary-item-label">{t('cards.minimumPayment')}</p>
+                    <p className="summary-item-value">{card.minimum_payment_percentage != null ? `${formatPercent(card.minimum_payment_percentage)} ${t('cards.ofAmountDue')}` : `${formatAmount(card.minimum_payment)} ${card.balance_currency}`}</p>
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Card Information */}
-            <div className="card info-card-sidebar">
-              <div className="section-header">
-                <CreditCardIcon size={20} />
-                <h3 className="section-title-small">{t('cards.cardInfo') || 'Card Information'}</h3>
-              </div>
-              <div className="info-list">
+              <div className="info-list info-list-border">
                 <div className="info-item">
                   <p className="info-label">{t('cards.cardType')}</p>
-                  <p className="info-value">{card.card_type}</p>
+                  <p className="info-value">{t(`cards.${card.card_type}`) || card.card_type}</p>
                 </div>
                 {card.card_network && (
                   <div className="info-item">
                     <p className="info-label">{t('cards.network')}</p>
-                    <p className="info-value info-value-uppercase">{card.card_network}</p>
+                    <p className="info-value">{t(`cards.network_${(card.card_network || '').toLowerCase()}`) || card.card_network}</p>
                   </div>
                 )}
                 {card.statement_date && (

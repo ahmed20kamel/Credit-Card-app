@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LanguageSwitcher() {
-  const { locale, setLocale, mounted, isRTL } = useTranslations();
+  const { locale, setLocale, mounted } = useTranslations();
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -71,7 +71,6 @@ export default function LanguageSwitcher() {
               key={lang.code}
               onClick={() => changeLanguage(lang.code)}
               className={`language-option ${locale === lang.code ? 'active' : ''}`}
-              style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
             >
               <span style={{ fontSize: '1.25rem' }}>{lang.flag}</span>
               <span style={{ flex: 1 }}>{lang.name}</span>

@@ -10,6 +10,8 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Save, CreditCard as CreditCardIcon, Building2, Wallet, FileText } from 'lucide-react';
 import { extractCardId } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/errors';
+import { UAE_BANKS } from '@/lib/uae-banks';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 export default function EditCardPage() {
   const router = useRouter();
@@ -38,6 +40,7 @@ export default function EditCardPage() {
     statement_date: '',
     payment_due_date: '',
     minimum_payment: '',
+    minimum_payment_percentage: '',
   });
 
   useEffect(() => {
@@ -76,6 +79,7 @@ export default function EditCardPage() {
         statement_date: card.statement_date != null ? String(card.statement_date) : '',
         payment_due_date: card.payment_due_date != null ? String(card.payment_due_date) : '',
         minimum_payment: card.minimum_payment != null ? String(card.minimum_payment) : '',
+        minimum_payment_percentage: card.minimum_payment_percentage != null ? String(card.minimum_payment_percentage) : '',
       });
       setLoading(false);
     } catch (err: unknown) {
@@ -119,6 +123,7 @@ export default function EditCardPage() {
         data.statement_date = formData.statement_date ? parseInt(formData.statement_date) : undefined;
         data.payment_due_date = formData.payment_due_date ? parseInt(formData.payment_due_date) : undefined;
         data.minimum_payment = formData.minimum_payment ? parseFloat(formData.minimum_payment) : undefined;
+        data.minimum_payment_percentage = formData.minimum_payment_percentage ? parseFloat(formData.minimum_payment_percentage) : undefined;
       }
 
       await cardsAPI.update(cardId, data as any);
@@ -200,13 +205,19 @@ export default function EditCardPage() {
                     <label>
                       {t('cards.bankName') || 'Bank Name'} *
                     </label>
-                    <input
-                      type="text"
-                      name="bank_name"
+                    <SearchableSelect
                       required
                       value={formData.bank_name}
-                      onChange={handleChange}
-                      placeholder="e.g., Emirates NBD"
+                      onChange={(bank) => setFormData((prev) => ({ ...prev, bank_name: bank }))}
+                      options={UAE_BANKS}
+                      placeholder={t('common.selectBank') || 'Search or select bank...'}
+                      noMatchesText={t('common.noMatches') || 'No matches'}
+                      extraOptions={
+                        formData.bank_name && !(UAE_BANKS as readonly string[]).includes(formData.bank_name)
+                          ? [formData.bank_name]
+                          : []
+                      }
+                      aria-label={t('cards.bankName') || 'Bank Name'}
                     />
                   </div>
                 </div>
@@ -216,46 +227,44 @@ export default function EditCardPage() {
                     <label>
                       {t('cards.cardType') || 'Card Type'} *
                     </label>
-                    <select
-                      name="card_type"
-                      required
+                    <SearchableSelect
                       value={formData.card_type}
-                      onChange={handleChange}
-                    >
-                      <option value="credit">{t('cards.credit') || 'Credit'}</option>
-                      <option value="debit">{t('cards.debit') || 'Debit'}</option>
-                      <option value="prepaid">{t('cards.prepaid') || 'Prepaid'}</option>
-                    </select>
+                      onChange={(v) => setFormData((prev) => ({ ...prev, card_type: v }))}
+                      options={[t('cards.credit'), t('cards.debit'), t('cards.prepaid')]}
+                      optionValues={['credit', 'debit', 'prepaid']}
+                      placeholder={t('common.search')}
+                      noMatchesText={t('common.noMatches')}
+                      aria-label={t('cards.cardType')}
+                    />
                   </div>
 
                   <div className="form-group">
                     <label>
                       {t('cards.cardNetwork') || 'Card Network'}
                     </label>
-                    <select
-                      name="card_network"
+                    <SearchableSelect
                       value={formData.card_network}
-                      onChange={handleChange}
-                    >
-                      <option value="">{t('common.autoDetected') || 'Auto-detected'}</option>
-                      <option value="visa">VISA</option>
-                      <option value="mastercard">Mastercard</option>
-                      <option value="amex">American Express</option>
-                      <option value="discover">Discover</option>
-                    </select>
+                      onChange={(v) => setFormData((prev) => ({ ...prev, card_network: v }))}
+                      options={[t('common.autoDetected'), t('cards.network_visa'), t('cards.network_mastercard'), t('cards.network_amex'), t('cards.network_discover')]}
+                      optionValues={['', 'visa', 'mastercard', 'amex', 'discover']}
+                      placeholder={t('common.search')}
+                      noMatchesText={t('common.noMatches')}
+                      aria-label={t('cards.cardNetwork')}
+                    />
                   </div>
                 </div>
 
-                <div className="form-group">
+                <div className="form-group credit-card-form-ltr" dir="ltr">
                   <label>
                     {t('cards.cardNumber') || 'Card Number'}
                   </label>
                   <input
-                    type="text"
+                    type="tel"
                     name="card_number"
+                    inputMode="numeric"
+                    autoComplete="cc-number"
                     value={formData.card_number.replace(/(.{4})/g, '$1 ').trim()}
                     onChange={(e) => {
-                      // Remove spaces and keep only digits
                       const value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
                       if (value.length <= 19) {
                         setFormData({ ...formData, card_number: value });
@@ -263,7 +272,7 @@ export default function EditCardPage() {
                     }}
                     placeholder="1234 5678 9012 3456"
                     maxLength={23}
-                    inputMode="numeric"
+                    aria-label="Card number"
                   />
                 </div>
 
@@ -442,6 +451,23 @@ export default function EditCardPage() {
                         onChange={handleChange}
                         placeholder="e.g., 500"
                       />
+                      <p className="form-hint">{t('cards.minimumPaymentHint') || 'Fixed amount, or use % below'}</p>
+                    </div>
+                    <div className="form-group">
+                      <label>
+                        {t('cards.minimumPaymentPercent') || 'Minimum Payment %'}
+                      </label>
+                      <input
+                        type="number"
+                        name="minimum_payment_percentage"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        value={formData.minimum_payment_percentage}
+                        onChange={handleChange}
+                        placeholder="e.g., 5"
+                      />
+                      <p className="form-hint">{t('cards.minimumPaymentPercentHint') || 'e.g. 5 = 5% of amount due (varies by bank)'}</p>
                     </div>
                   </div>
                 </div>

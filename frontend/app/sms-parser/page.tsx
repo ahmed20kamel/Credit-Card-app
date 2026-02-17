@@ -8,6 +8,7 @@ import { transactionsAPI } from '@/app/api/transactions';
 import api from '@/app/api/client';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import toast from 'react-hot-toast';
 import { 
   MessageSquare, 
@@ -363,18 +364,15 @@ export default function TransactionImporterPage() {
                   <label className="auto-create-card-label">
                     {t('addTransaction.selectCard')}
                   </label>
-                  <select
+                  <SearchableSelect
                     value={selectedCard}
-                    onChange={(e) => setSelectedCard(e.target.value)}
-                    className="auto-create-select"
-                  >
-                    <option value="">{t('addTransaction.autoDetect')}</option>
-                    {cards.map((card) => (
-                      <option key={card.id} value={card.id}>
-                        {card.card_name} - {card.bank_name} (**** {card.card_last_four})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedCard}
+                    options={[t('addTransaction.autoDetect'), ...cards.map((c) => `${c.card_name} - ${c.bank_name} (****${c.card_last_four})`)]}
+                    optionValues={['', ...cards.map((c) => c.id)]}
+                    placeholder={t('common.search')}
+                    noMatchesText={t('common.noMatches')}
+                    aria-label={t('addTransaction.selectCard')}
+                  />
                   <p className="auto-create-card-help">{t('addTransaction.selectCardHelp')}</p>
                 </div>
               )}
@@ -439,17 +437,14 @@ export default function TransactionImporterPage() {
                       </div>
                       <div className="form-group">
                         <label className="form-label">{t('addTransaction.transactionType')}</label>
-                        <select
+                        <SearchableSelect
                           value={editedData?.transaction_type || 'purchase'}
-                          onChange={(e) => setEditedData({ ...editedData, transaction_type: e.target.value })}
-                          className="form-input form-select"
-                        >
-                          <option value="purchase">{t('transactions.purchase')}</option>
-                          <option value="withdrawal">{t('transactions.withdrawal')}</option>
-                          <option value="payment">{t('transactions.payment')}</option>
-                          <option value="refund">{t('transactions.refund')}</option>
-                          <option value="transfer">{t('transactions.transfer')}</option>
-                        </select>
+                          onChange={(v) => setEditedData({ ...editedData, transaction_type: v })}
+                          options={[t('transactions.purchase'), t('transactions.withdrawal'), t('transactions.payment'), t('transactions.refund'), t('transactions.transfer')]}
+                          optionValues={['purchase', 'withdrawal', 'payment', 'refund', 'transfer']}
+                          placeholder={t('common.search')}
+                          noMatchesText={t('common.noMatches')}
+                        />
                       </div>
                       <div className="form-group">
                         <label className="form-label">{t('transactions.merchant')}</label>
@@ -653,35 +648,27 @@ export default function TransactionImporterPage() {
             <form onSubmit={handleManualSubmit} className="form-layout">
               <div className="form-group">
                 <label className="form-label">{t('addTransaction.cardOptional')}</label>
-                <select
+                <SearchableSelect
                   value={manualForm.card_id}
-                  onChange={(e) => setManualForm({ ...manualForm, card_id: e.target.value })}
-                  className="form-input form-select"
-                >
-                  <option value="">{t('addTransaction.noneCash')}</option>
-                  {cards.map((card) => (
-                    <option key={card.id} value={card.id}>
-                      {card.card_name} - ****{card.card_last_four}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setManualForm({ ...manualForm, card_id: v })}
+                  options={[t('addTransaction.noneCash'), ...cards.map((c) => `${c.card_name} - ****${c.card_last_four}`)]}
+                  optionValues={['', ...cards.map((c) => c.id)]}
+                  placeholder={t('common.search')}
+                  noMatchesText={t('common.noMatches')}
+                />
               </div>
 
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">{t('addTransaction.transactionType')} *</label>
-                  <select
-                    required
+                  <SearchableSelect
                     value={manualForm.transaction_type}
-                    onChange={(e) => setManualForm({ ...manualForm, transaction_type: e.target.value })}
-                    className="form-input form-select"
-                  >
-                    <option value="purchase">{t('transactions.purchase')}</option>
-                    <option value="withdrawal">{t('transactions.withdrawal')}</option>
-                    <option value="payment">{t('transactions.payment')}</option>
-                    <option value="refund">{t('transactions.refund')}</option>
-                    <option value="transfer">{t('transactions.transfer')}</option>
-                  </select>
+                    onChange={(v) => setManualForm({ ...manualForm, transaction_type: v })}
+                    options={[t('transactions.purchase'), t('transactions.withdrawal'), t('transactions.payment'), t('transactions.refund'), t('transactions.transfer')]}
+                    optionValues={['purchase', 'withdrawal', 'payment', 'refund', 'transfer']}
+                    placeholder={t('common.search')}
+                    noMatchesText={t('common.noMatches')}
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label">{t('addTransaction.amount')} *</label>

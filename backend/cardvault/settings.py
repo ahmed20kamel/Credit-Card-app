@@ -12,6 +12,8 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-producti
 DEBUG = config('DEBUG', default='False', cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0').split(',')
+if DEBUG:
+    ALLOWED_HOSTS = ['*']  # allow network access when dev server binds to 0.0.0.0
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -112,19 +114,20 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Disable trailing slash redirect for API
-APPEND_SLASH = False
+# Allow trailing slash so /api/v1/cards and /api/v1/cards/ both work (proxy sends no slash)
+APPEND_SLASH = True
 
 STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'api.authentication.SafeJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'EXCEPTION_HANDLER': 'api.exceptions.api_exception_handler',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_THROTTLE_CLASSES': [
@@ -142,7 +145,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    'BLACKLIST_AFTER_ROTATION': False,  # set True only if token_blacklist app is installed & migrated
 }
 
 # CORS Settings
@@ -153,6 +156,9 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:3001',
     'http://localhost:3003',
     'http://127.0.0.1:3003',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+    'http://192.168.1.53:8080',
 ]
 
 # Allow additional origins from environment variable

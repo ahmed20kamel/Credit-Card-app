@@ -10,21 +10,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-    // Initialize locale
+    // Initialize locale (setLocale updates document and dispatches 'localechange' for other components)
     const locale = getLocale();
-    setLocale(locale); // This will set dir on html element
-    
+    setLocale(locale);
+
     // Initialize theme
     applyTheme(getTheme());
-
-    // Listen for locale changes
-    const handleLocaleChange = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      if (customEvent.detail?.locale) {
-        setLocale(customEvent.detail.locale);
-      }
-    };
-    window.addEventListener('localechange', handleLocaleChange);
 
     // Listen for system theme changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -34,9 +25,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       }
     };
     mediaQuery.addEventListener('change', handleChange);
-    
+
     return () => {
-      window.removeEventListener('localechange', handleLocaleChange);
       mediaQuery.removeEventListener('change', handleChange);
     };
   }, []);

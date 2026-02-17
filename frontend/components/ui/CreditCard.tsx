@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useTranslations } from '@/lib/i18n';
 
 export type CreditCardValue = {
   cardholderName: string;
@@ -25,8 +26,10 @@ function onlyDigits(s: string) {
   return s.replace(/\D/g, '');
 }
 
+const CARD_NUMBER_LENGTH = 16;
+
 function formatCardNumber(raw: string) {
-  const digits = onlyDigits(raw).slice(0, 19);
+  const digits = onlyDigits(raw).slice(0, CARD_NUMBER_LENGTH);
   const parts: string[] = [];
   for (let i = 0; i < digits.length; i += 4) parts.push(digits.slice(i, i + 4));
   return parts.join(' ').trim();
@@ -34,7 +37,7 @@ function formatCardNumber(raw: string) {
 
 function luhnCheck(num: string) {
   const digits = onlyDigits(num);
-  if (digits.length < 13) return false;
+  if (digits.length !== CARD_NUMBER_LENGTH) return false;
   let sum = 0;
   let shouldDouble = false;
   for (let i = digits.length - 1; i >= 0; i--) {
@@ -82,6 +85,7 @@ export function CreditCard({
   }, [value]);
 
   const [focused, setFocused] = React.useState<'front' | 'back'>('front');
+  const { t } = useTranslations();
 
   const vendor = detectVendor(local.cardNumber);
 
@@ -90,7 +94,7 @@ export function CreditCard({
 
     const clean = onlyDigits(local.cardNumber);
     if (!clean) e.cardNumber = 'Card number is required';
-    else if (!/^\d{13,19}$/.test(clean)) e.cardNumber = 'Card number must be 13–19 digits';
+    else if (clean.length !== CARD_NUMBER_LENGTH) e.cardNumber = `Card number must be exactly ${CARD_NUMBER_LENGTH} digits`;
     else if (!luhnCheck(clean)) e.cardNumber = 'Invalid card number';
 
     const mm = parseInt(local.expiryMonth || '0', 10);
@@ -129,8 +133,8 @@ export function CreditCard({
   };
 
   return (
-    <div className={className}>
-      {/* Card Preview */}
+    <div className={`credit-card-form-ltr ${className ?? ''}`.trim()} dir="ltr">
+      {/* Card Preview - always LTR so number reads left-to-right */}
       <div className="credit-card-preview-wrapper">
         <div className="credit-card-perspective">
           <div
@@ -160,14 +164,14 @@ export function CreditCard({
 
               <div className="credit-card-front-footer">
                 <div className="credit-card-holder-section">
-                  <div className="credit-card-label-small">Card Holder</div>
+                  <div className="credit-card-label-small">{t('cards.cardholderName') || 'Cardholder Name'}</div>
                   <div className="credit-card-name-display">
                     {(local.cardholderName || 'YOUR NAME').toUpperCase()}
                   </div>
                 </div>
 
                 <div className="credit-card-expiry-display">
-                  <div className="credit-card-label-small">Expires</div>
+                  <div className="credit-card-label-small">{t('cards.expires') || 'Expires'}</div>
                   <div className="credit-card-expiry-value-display">
                     {(local.expiryMonth || 'MM').padStart(2, '0')}/{(local.expiryYear ? String(local.expiryYear).slice(-2) : 'YY')}
                   </div>
@@ -195,7 +199,7 @@ export function CreditCard({
       {/* Inputs */}
       <div className="credit-card-inputs">
         <div className="credit-card-input-group">
-          <label>Cardholder Name</label>
+          <label>{t('cards.cardholderName') || 'Cardholder Name'}</label>
           <input
             value={local.cardholderName}
             onChange={(e) => update({ cardholderName: e.target.value })}
@@ -206,43 +210,53 @@ export function CreditCard({
         </div>
 
         <div className="credit-card-input-group">
-          <label>Card Number</label>
+          <label>{t('cards.cardNumber') || 'Card Number'}</label>
           <input
-            value={local.cardNumber}
-            onChange={(e) => update({ cardNumber: formatCardNumber(e.target.value) })}
-            onFocus={() => setFocused('front')}
+            type="tel"
             inputMode="numeric"
+            pattern="[0-9\s]*"
+            autoComplete="cc-number"
+            value={local.cardNumber}
+            onChange={(e) => {
+              const digitsOnly = onlyDigits(e.target.value).slice(0, CARD_NUMBER_LENGTH);
+              update({ cardNumber: formatCardNumber(digitsOnly) });
+            }}
+            onFocus={() => setFocused('front')}
             placeholder="1234 5678 9012 3456"
+            maxLength={19}
+            aria-label="Card number"
           />
           {errors.cardNumber && <p className="credit-card-error">{errors.cardNumber}</p>}
         </div>
 
         <div className="credit-card-input-row">
           <div className="credit-card-input-group">
-            <label>Month</label>
+            <label>{t('cards.month') || 'Month'}</label>
             <input
-              type="number"
+              type="tel"
+              inputMode="numeric"
               value={local.expiryMonth}
               onChange={(e) => update({ expiryMonth: onlyDigits(e.target.value).slice(0, 2) })}
               onFocus={() => setFocused('front')}
-              inputMode="numeric"
               placeholder="MM"
-              min="1"
-              max="12"
+              minLength={1}
+              maxLength={2}
+              aria-label="Expiry month"
             />
             {errors.expiryMonth && <p className="credit-card-error">{errors.expiryMonth}</p>}
           </div>
 
           <div className="credit-card-input-group">
-            <label>Year</label>
+            <label>{t('cards.year') || 'Year'}</label>
             <input
-              type="number"
+              type="tel"
+              inputMode="numeric"
               value={local.expiryYear}
               onChange={(e) => update({ expiryYear: onlyDigits(e.target.value).slice(0, 4) })}
               onFocus={() => setFocused('front')}
-              inputMode="numeric"
               placeholder="YYYY"
-              min={new Date().getFullYear()}
+              maxLength={4}
+              aria-label="Expiry year"
             />
             {errors.expiryYear && <p className="credit-card-error">{errors.expiryYear}</p>}
           </div>
@@ -250,14 +264,15 @@ export function CreditCard({
           <div className="credit-card-input-group">
             <label>{local.cvvLabel ?? cvvLabel}</label>
             <input
-              type="number"
+              type="tel"
+              inputMode="numeric"
               value={local.cvv}
               onChange={(e) => update({ cvv: onlyDigits(e.target.value).slice(0, 4) })}
               onFocus={() => setFocused('back')}
               onBlur={() => setFocused('front')}
-              inputMode="numeric"
               placeholder="123"
-              min="0"
+              maxLength={4}
+              aria-label="CVV"
             />
             {errors.cvv && <p className="credit-card-error">{errors.cvv}</p>}
           </div>

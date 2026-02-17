@@ -9,6 +9,9 @@ import { useTranslations } from '@/lib/i18n';
 import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CreditCard, type CreditCardValue } from '@/components/ui/CreditCard';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { UAE_BANKS } from '@/lib/uae-banks';
+import { getErrorMessage } from '@/lib/errors';
 
 function NewCardContent() {
   const router = useRouter();
@@ -38,6 +41,7 @@ function NewCardContent() {
     statement_date: '',
     payment_due_date: '',
     minimum_payment: '',
+    minimum_payment_percentage: '',
     credit_limit: '',
     current_balance: '',
   });
@@ -73,25 +77,33 @@ function NewCardContent() {
     setLoading(true);
 
     try {
-      const data: any = {
-        ...formData,
+      const num = (v: string) => (v && !Number.isNaN(Number(v)) ? Number(v) : null);
+      const data = {
+        card_name: formData.card_name || '',
+        bank_name: formData.bank_name || '',
+        card_type: formData.card_type || 'credit',
+        card_network: formData.card_network || undefined,
         card_number: creditCard.cardNumber.replace(/\s/g, ''),
-        cardholder_name: creditCard.cardholderName,
-        expiry_month: creditCard.expiryMonth ? parseInt(creditCard.expiryMonth) : null,
-        expiry_year: creditCard.expiryYear ? parseInt(creditCard.expiryYear) : null,
-        cvv: creditCard.cvv,
-        available_balance: formData.available_balance ? parseFloat(formData.available_balance) : null,
-        statement_date: formData.statement_date ? parseInt(formData.statement_date) : null,
-        payment_due_date: formData.payment_due_date ? parseInt(formData.payment_due_date) : null,
-        minimum_payment: formData.minimum_payment ? parseFloat(formData.minimum_payment) : null,
-        credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : null,
-        current_balance: formData.current_balance ? parseFloat(formData.current_balance) : null,
+        cardholder_name: creditCard.cardholderName || undefined,
+        expiry_month: num(creditCard.expiryMonth) ?? undefined,
+        expiry_year: num(creditCard.expiryYear) ?? undefined,
+        cvv: creditCard.cvv || undefined,
+        notes: formData.notes || undefined,
+        color_hex: formData.color_hex || undefined,
+        balance_currency: formData.balance_currency || undefined,
+        available_balance: num(formData.available_balance) ?? undefined,
+        statement_date: num(formData.statement_date) ?? undefined,
+        payment_due_date: num(formData.payment_due_date) ?? undefined,
+        minimum_payment: num(formData.minimum_payment) ?? undefined,
+        minimum_payment_percentage: num(formData.minimum_payment_percentage) ?? undefined,
+        credit_limit: num(formData.credit_limit) ?? undefined,
+        current_balance: num(formData.current_balance) ?? undefined,
       };
       await cardsAPI.create(data);
       toast.success(t('success.cardCreated') || 'Card created successfully');
       router.push('/cards');
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to create card';
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to create card');
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -163,12 +175,14 @@ function NewCardContent() {
 
                   <div className="form-group">
                     <label>{t('cards.bankName') || 'Bank Name'} *</label>
-                    <input
-                      type="text"
+                    <SearchableSelect
                       required
                       value={formData.bank_name}
-                      onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                      placeholder="e.g., Emirates NBD"
+                      onChange={(bank) => setFormData({ ...formData, bank_name: bank })}
+                      options={UAE_BANKS}
+                      placeholder={t('common.selectBank') || 'Search or select bank...'}
+                      noMatchesText={t('common.noMatches') || 'No matches'}
+                      aria-label={t('cards.bankName') || 'Bank Name'}
                     />
                   </div>
                 </div>
@@ -176,29 +190,29 @@ function NewCardContent() {
                 <div className="grid grid-2">
                   <div className="form-group">
                     <label>{t('cards.cardType') || 'Card Type'} *</label>
-                    <select
+                    <SearchableSelect
                       required
                       value={formData.card_type}
-                      onChange={(e) => setFormData({ ...formData, card_type: e.target.value })}
-                    >
-                      <option value="credit">{t('cards.credit') || 'Credit'}</option>
-                      <option value="debit">{t('cards.debit') || 'Debit'}</option>
-                      <option value="prepaid">{t('cards.prepaid') || 'Prepaid'}</option>
-                    </select>
+                      onChange={(v) => setFormData({ ...formData, card_type: v })}
+                      options={[t('cards.credit'), t('cards.debit'), t('cards.prepaid')]}
+                      optionValues={['credit', 'debit', 'prepaid']}
+                      placeholder={t('common.search')}
+                      noMatchesText={t('common.noMatches')}
+                      aria-label={t('cards.cardType')}
+                    />
                   </div>
 
                   <div className="form-group">
                     <label>{t('cards.cardNetwork') || 'Card Network'}</label>
-                    <select
+                    <SearchableSelect
                       value={formData.card_network}
-                      onChange={(e) => setFormData({ ...formData, card_network: e.target.value })}
-                    >
-                      <option value="">{t('common.autoDetected') || 'Auto-detected'}</option>
-                      <option value="visa">VISA</option>
-                      <option value="mastercard">Mastercard</option>
-                      <option value="amex">American Express</option>
-                      <option value="discover">Discover</option>
-                    </select>
+                      onChange={(v) => setFormData({ ...formData, card_network: v })}
+                      options={[t('common.autoDetected'), t('cards.network_visa'), t('cards.network_mastercard'), t('cards.network_amex'), t('cards.network_discover')]}
+                      optionValues={['', 'visa', 'mastercard', 'amex', 'discover']}
+                      placeholder={t('common.search')}
+                      noMatchesText={t('common.noMatches')}
+                      aria-label={t('cards.cardNetwork')}
+                    />
                   </div>
                 </div>
               </div>
@@ -284,6 +298,20 @@ function NewCardContent() {
                         onChange={(e) => setFormData({ ...formData, minimum_payment: e.target.value })}
                         placeholder="e.g., 500"
                       />
+                      <p className="form-hint">{t('cards.minimumPaymentHint') || 'Fixed amount, or use % below'}</p>
+                    </div>
+                    <div className="form-group">
+                      <label>{t('cards.minimumPaymentPercent') || 'Minimum Payment %'}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        value={formData.minimum_payment_percentage}
+                        onChange={(e) => setFormData({ ...formData, minimum_payment_percentage: e.target.value })}
+                        placeholder="e.g., 5"
+                      />
+                      <p className="form-hint">{t('cards.minimumPaymentPercentHint') || 'e.g. 5 = 5% of amount due (varies by bank)'}</p>
                     </div>
                   </div>
                 </div>

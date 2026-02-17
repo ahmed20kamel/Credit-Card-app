@@ -239,8 +239,9 @@ class GenericParser(BaseBankParser):
         
         # Card last 4 patterns (Arabic and English)
         last4_patterns = [
-            re.compile(r'XXX(\d{4})', re.IGNORECASE),  # XXX3287 format - check first
-            re.compile(r'(?:card|بطاقة|بطاقتك|card\s+ending|ending|xxxx|المنتهية\s+ب|المنتهية|ب)\s*[\s:]*(\d{4})', re.IGNORECASE),
+            re.compile(r'XXX(\d{4})', re.IGNORECASE),  # XXX3287 format
+            re.compile(r'XX(\d{4})', re.IGNORECASE),  # XX7029 format (e.g. Covered Card XX7029)
+            re.compile(r'(?:card|بطاقة|بطاقتك|card\s+ending|ending|xxxx|covered\s+card|المنتهية\s+ب|المنتهية|ب)\s*[\s:]*[Xx]*\s*(\d{4})', re.IGNORECASE),
             re.compile(r'البطاقة\s+(\d{4})', re.IGNORECASE),  # Arabic: البطاقة 7665
             re.compile(r'بطاقتك\s+(\d{4})', re.IGNORECASE),  # Arabic: بطاقتك 7665
         ]
@@ -293,8 +294,10 @@ class GenericParser(BaseBankParser):
             re.compile(r'(\d{2})/(\d{2})/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})', re.IGNORECASE),  # 10/02/2026 13:36:02
             re.compile(r'(\d{2})/(\d{2})/(\d{4})', re.IGNORECASE),  # 10/02/2026
             re.compile(r'(\d{4})-(\d{2})-(\d{2})', re.IGNORECASE),  # 2026-02-10
+            re.compile(r'(\d{2})-(\w{3})-(\d{4})\s+(\d{2}):(\d{2})', re.IGNORECASE),  # 10-FEB-2026 18:02
         ]
-        
+        month_abbr = {'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12}
+
         transaction_date = received_at
         for pattern in date_patterns:
             date_match = pattern.search(sms_body)
@@ -303,6 +306,10 @@ class GenericParser(BaseBankParser):
                     if len(date_match.groups()) == 6:  # With time
                         day, month, year, hour, minute, second = date_match.groups()
                         transaction_date = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+                    elif len(date_match.groups()) == 5:  # 10-FEB-2026 18:02
+                        day, month_str, year, hour, minute = date_match.groups()
+                        month = month_abbr.get(month_str.lower()[:3], 1)
+                        transaction_date = datetime(int(year), month, int(day), int(hour), int(minute), 0)
                     elif len(date_match.groups()) == 3:
                         if len(date_match.group(1)) == 4:  # YYYY-MM-DD
                             year, month, day = date_match.groups()
@@ -311,7 +318,7 @@ class GenericParser(BaseBankParser):
                             day, month, year = date_match.groups()
                             transaction_date = datetime(int(year), int(month), int(day))
                     break
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, KeyError):
                     pass
         
         # Determine transaction type (Arabic and English)

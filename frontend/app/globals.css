@@ -414,6 +414,39 @@ p {
   flex-shrink: 0;
 }
 
+.sidebar-user-section {
+  padding: var(--space-4);
+  border-top: 1px solid var(--border-light);
+  background: var(--gray-50);
+  margin-top: auto;
+}
+
+.sidebar-user-box {
+  padding: var(--space-3);
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.sidebar-user-label {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.sidebar-user-email {
+  font-size: 0.875rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  margin: 0;
+}
+
 .main-content {
   flex: 1;
   margin-top: 64px;
@@ -1106,29 +1139,6 @@ p {
   gap: var(--space-4);
   position: sticky;
   top: calc(56px + var(--space-6));
-}
-
-.card-preview-section {
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: var(--space-8) 0;
-  box-shadow: none;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transition: var(--transition);
-  position: relative;
-  overflow: visible;
-}
-
-.card-preview-section::before {
-  display: none;
-}
-
-.card-preview-section:hover {
-  box-shadow: none;
-  border-color: transparent;
 }
 
 .card-detail-page .credit-card-container {
@@ -2031,38 +2041,16 @@ tr:hover {
 }
 
 /* ============================================
-   RTL SUPPORT
+   RTL – اتجاه واحد فقط (مصدر واحد)
    ============================================ */
 
-/* ============================================
-   RTL SUPPORT - Base Direction
-   ============================================ */
-
-/* Base RTL direction - apply to all elements */
+/* تعيين الاتجاه من عنصر html فقط */
 html[dir="rtl"],
-html[dir="rtl"] * {
-  direction: rtl;
-}
-
-html[dir="ltr"],
-html[dir="ltr"] * {
-  direction: ltr;
-}
-
-/* Ensure body inherits direction */
-html[dir="rtl"] body {
-  direction: rtl;
-}
-
-html[dir="ltr"] body {
-  direction: ltr;
-}
-
-/* Force RTL on all children when html has dir="rtl" */
 html[dir="rtl"] * {
   direction: rtl !important;
 }
 
+html[dir="ltr"],
 html[dir="ltr"] * {
   direction: ltr !important;
 }
@@ -2074,12 +2062,21 @@ html[dir="rtl"] .no-rtl {
   direction: ltr !important;
 }
 
+/* Card form & preview: always LTR so card number and expiry type left-to-right (no reverse typing in Arabic) */
+html[dir="rtl"] .credit-card-form-ltr,
+html[dir="rtl"] .credit-card-form-ltr * {
+  direction: ltr !important;
+  text-align: left;
+}
+
 [dir="rtl"] .sidebar {
   right: 0;
   left: auto;
   border-right: none;
   border-left: 1px solid var(--border);
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.03);
+  direction: rtl;
+  text-align: right;
 }
 
 [dir="ltr"] .sidebar {
@@ -2087,9 +2084,40 @@ html[dir="rtl"] .no-rtl {
   right: auto;
 }
 
+[dir="rtl"] .sidebar-header {
+  text-align: right;
+}
+
+[dir="rtl"] .sidebar-header::before {
+  left: auto;
+  right: 0;
+  background: linear-gradient(90deg, transparent 0%, var(--primary-light) 50%, var(--primary) 100%);
+}
+
+[dir="rtl"] .sidebar-nav {
+  text-align: right;
+}
+
+[dir="rtl"] .nav-item {
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+[dir="rtl"] .nav-item::before {
+  left: auto;
+  right: 0;
+  border-radius: 2px 0 0 2px;
+}
+
 [dir="rtl"] .nav-item:hover,
 [dir="rtl"] .nav-item.active {
   transform: translateX(-4px);
+}
+
+[dir="rtl"] .sidebar-user-section,
+[dir="rtl"] .sidebar-user-box {
+  text-align: right;
 }
 
 [dir="rtl"] .main-content {
@@ -2109,8 +2137,13 @@ html[dir="rtl"] .no-rtl {
 }
 
 [dir="rtl"] .navbar-content {
+  flex-direction: row-reverse;
   padding-right: calc(240px + var(--space-6));
   padding-left: var(--space-6);
+}
+
+[dir="rtl"] .navbar-actions {
+  flex-direction: row-reverse;
 }
 
 [dir="ltr"] .navbar-content {
@@ -2273,18 +2306,9 @@ html[dir="rtl"] .no-rtl {
   flex-direction: row-reverse;
 }
 
-/* RTL: Nav item - flip icon order */
-[dir="rtl"] .nav-item {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Breadcrumbs - reverse order */
-[dir="rtl"] .breadcrumbs {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Language option - flip icon order */
-[dir="rtl"] .language-option {
+/* RTL: Language option & theme option - flip order */
+[dir="rtl"] .language-option,
+[dir="rtl"] .theme-option {
   flex-direction: row-reverse;
   text-align: right;
 }
@@ -2570,6 +2594,12 @@ html[dir="rtl"] .no-rtl {
 }
 
 [dir="rtl"] .breadcrumbs {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  text-align: right;
+}
+
+[dir="rtl"] .breadcrumb-item {
   flex-direction: row-reverse;
 }
 
@@ -3241,6 +3271,17 @@ html[dir="rtl"] .no-rtl {
   color: var(--success);
 }
 
+.summary-item-full {
+  grid-column: 1 / -1;
+  margin-top: var(--space-2);
+}
+
+.info-list-border {
+  border-top: 1px solid var(--border);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+}
+
 .info-list {
   display: flex;
   flex-direction: column;
@@ -3294,6 +3335,12 @@ html[dir="rtl"] .no-rtl {
   margin-bottom: var(--space-6);
 }
 
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: var(--space-1);
+}
+
 .form-group label {
   display: block;
   font-size: 0.875rem;
@@ -3332,6 +3379,97 @@ html[dir="rtl"] .no-rtl {
 .form-group input::placeholder,
 .form-group textarea::placeholder {
   color: var(--text-light);
+}
+
+/* Searchable select (combobox) */
+.searchable-select {
+  position: relative;
+  width: 100%;
+}
+
+.searchable-select-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchable-select-input {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  padding-right: 2.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--text);
+  transition: var(--transition);
+}
+
+.searchable-select-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(107, 44, 145, 0.1);
+}
+
+.searchable-select-chevron {
+  position: absolute;
+  right: var(--space-3);
+  pointer-events: none;
+  color: var(--text-light);
+  font-size: 0.65rem;
+}
+
+[dir="rtl"] .searchable-select-chevron {
+  right: auto;
+  left: var(--space-3);
+}
+
+[dir="rtl"] .searchable-select-input {
+  padding-right: var(--space-4);
+  padding-left: 2.25rem;
+}
+
+.searchable-select-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  margin-top: 2px;
+  padding: var(--space-1);
+  max-height: 260px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+}
+
+[dir="rtl"] .searchable-select-list {
+  left: auto;
+  right: 0;
+}
+
+.searchable-select-item {
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.875rem;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.searchable-select-item:hover,
+.searchable-select-item.highlighted {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+.searchable-select-empty {
+  color: var(--text-light);
+  cursor: default;
 }
 
 .form-error {
@@ -3641,7 +3779,7 @@ html[dir="rtl"] .no-rtl {
 
 .credit-card-preview-wrapper {
   width: 100%;
-  max-width: 380px;
+  max-width: 420px;
   margin: 0 auto var(--space-6);
 }
 
@@ -3651,7 +3789,7 @@ html[dir="rtl"] .no-rtl {
 
 .credit-card-3d {
   position: relative;
-  height: 220px;
+  height: 240px;
   width: 100%;
   transform-style: preserve-3d;
   transition: transform 0.6s ease;
@@ -3661,14 +3799,14 @@ html[dir="rtl"] .no-rtl {
 .credit-card-back {
   position: absolute;
   inset: 0;
-  border-radius: 12px;
-  padding: var(--space-4);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 14px;
+  padding: var(--space-5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   backface-visibility: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .credit-card-default {
@@ -3709,7 +3847,7 @@ html[dir="rtl"] .no-rtl {
 
 .credit-card-number-display {
   font-family: 'Courier New', monospace;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--text);
@@ -3728,11 +3866,16 @@ html[dir="rtl"] .no-rtl {
 }
 
 .credit-card-label-small {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   text-transform: uppercase;
   color: var(--text-secondary);
   margin-bottom: 0.25rem;
   letter-spacing: 0.05em;
+}
+
+.credit-card-back-cvv-section .credit-card-label-small {
+  font-size: 0.75rem;
+  color: var(--text);
 }
 
 .credit-card-name-display {
@@ -3765,20 +3908,27 @@ html[dir="rtl"] .no-rtl {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: var(--space-3);
+  margin-top: var(--space-4);
+  gap: var(--space-3);
 }
 
 .credit-card-cvv-display {
-  padding: var(--space-2) var(--space-3);
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-lg);
   font-family: 'Courier New', monospace;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
   color: var(--text);
-  min-width: 60px;
+  min-width: 72px;
   text-align: center;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .credit-card-cvv-display {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .credit-card-back-footer {

@@ -1,6 +1,7 @@
 import os
 import re
 import logging
+from typing import Optional
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -76,7 +77,7 @@ def update_card_balance(card):
     card.save(update_fields=['current_balance', 'available_balance', 'updated_at'])
 
 
-def detect_card_network(card_number: str) -> str | None:
+def detect_card_network(card_number: str) -> Optional[str]:
     num = re.sub(r"\D", "", card_number)
     if not num:
         return None

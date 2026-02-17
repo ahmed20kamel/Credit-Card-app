@@ -31,24 +31,45 @@ def register(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _get_login_data(request):
+    """Get email/password from request (JSON body or POST)."""
+    data = getattr(request, 'data', None) or {}
+    if not isinstance(data, dict):
+        data = {}
+    if not data and request.body:
+        import json
+        try:
+            data = json.loads(request.body.decode('utf-8')) or {}
+        except Exception:
+            pass
+    email = data.get('email') or (request.POST.get('email') if request.POST else None)
+    password = data.get('password') or (request.POST.get('password') if request.POST else None)
+    return email, password
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
-    email = request.data.get('email')
-    password = request.data.get('password')
-    
-    if not email or not password:
-        return Response({'detail': 'Email and password required'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    user = authenticate(request, username=email, password=password)
-    if user:
-        refresh = RefreshToken.for_user(user)
-        return Response({
-            'access_token': str(refresh.access_token),
-            'refresh_token': str(refresh),
-            'token_type': 'bearer'
-        })
-    return Response({'detail': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+    try:
+        email, password = _get_login_data(request)
+        
+        if not email or not password:
+            return Response({'detail': 'Email and password required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = authenticate(request, username=email, password=password)
+        if user:
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'access_token': str(refresh.access_token),
+                'refresh_token': str(refresh),
+                'token_type': 'bearer'
+            })
+        return Response({'detail': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception('Login error: %s', e)
+        # Never return 500 to client: treat as invalid credentials so UI stays usable
+        return Response({'detail': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 @api_view(['POST'])
@@ -73,15 +94,23 @@ def refresh_token(request):
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
 def profile(request):
-    if request.method == 'GET':
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
-    else:
-        serializer = UserSerializer(request.user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
+    try:
+        if request.method == 'GET':
+            serializer = UserSerializer(request.user)
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            serializer = UserSerializer(request.user, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception('Profile error: %s', e)
+        return Response(
+            {'detail': 'Invalid or expired token. Please log in again.'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
 
 
 @api_view(['POST'])

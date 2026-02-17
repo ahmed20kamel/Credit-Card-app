@@ -95,38 +95,10 @@ export default function Sidebar({ userEmail, onLogout }: SidebarProps) {
           </nav>
 
           {/* User Section */}
-          <div style={{
-            padding: 'var(--space-4)',
-            borderTop: '1px solid var(--border-light)',
-            background: 'var(--gray-50)',
-            marginTop: 'auto',
-          }}>
-            <div style={{
-              padding: 'var(--space-3)',
-              background: 'var(--bg)',
-              borderRadius: 'var(--radius)',
-              border: '1px solid var(--border)',
-            }}>
-              <p style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-light)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                marginBottom: '0.25rem',
-                fontWeight: 600,
-              }}>
-                {t('common.user')}
-              </p>
-              <p style={{
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                color: 'var(--text)',
-              }}>
-                {userEmail || 'User'}
-              </p>
+          <div className="sidebar-user-section">
+            <div className="sidebar-user-box">
+              <p className="sidebar-user-label">{t('common.user')}</p>
+              <p className="sidebar-user-email">{userEmail || 'User'}</p>
             </div>
           </div>
         </div>

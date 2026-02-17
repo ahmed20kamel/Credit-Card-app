@@ -8,6 +8,7 @@ import { transactionsAPI, Transaction } from '@/app/api/transactions';
 import { cardsAPI, Card } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
+import { formatAmount } from '@/lib/formatNumber';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { 
@@ -26,6 +27,7 @@ import {
 } from 'lucide-react';
 import BulkActions from '@/components/BulkActions';
 import LoadingState from '@/components/ui/LoadingState';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 
@@ -184,7 +186,7 @@ export default function TransactionsPage() {
             <div className="summary-content">
               <div className="summary-label">{t('transactions.totalBalance')}</div>
               <div className="summary-value">
-                {totalAmount >= 0 ? '+' : ''}{totalAmount.toFixed(2)} <span className="summary-currency">AED</span>
+                {totalAmount >= 0 ? '+' : ''}{formatAmount(totalAmount)} <span className="summary-currency">AED</span>
               </div>
             </div>
             <div className="summary-icon">
@@ -207,34 +209,37 @@ export default function TransactionsPage() {
                 <Filter size={16} />
                 {t('transactions.filterByCard')}
               </label>
-              <select
+              <SearchableSelect
                 value={selectedCard}
-                onChange={(e) => setSelectedCard(e.target.value)}
-              >
-                <option value="all">{t('transactions.allCards')}</option>
-                {cards.map((card) => (
-                  <option key={card.id} value={card.id}>
-                    {card.card_name} - ****{card.card_last_four}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedCard}
+                options={[t('transactions.allCards'), ...cards.map((c) => `${c.card_name} - ****${c.card_last_four}`)]}
+                optionValues={['all', ...cards.map((c) => c.id)]}
+                placeholder={t('common.search')}
+                noMatchesText={t('common.noMatches')}
+                aria-label={t('transactions.filterByCard')}
+              />
             </div>
             <div>
               <label className="flex items-center gap-2 mb-2">
                 <Filter size={16} />
                 {t('transactions.filterByType')}
               </label>
-              <select
+              <SearchableSelect
                 value={transactionType}
-                onChange={(e) => setTransactionType(e.target.value)}
-              >
-                <option value="all">{t('transactions.allTypes')}</option>
-                <option value="purchase">{t('transactions.purchase')}</option>
-                <option value="withdrawal">{t('transactions.withdrawal')}</option>
-                <option value="payment">{t('transactions.payment')}</option>
-                <option value="refund">{t('transactions.refund')}</option>
-                <option value="transfer">{t('transactions.transfer')}</option>
-              </select>
+                onChange={setTransactionType}
+                options={[
+                  t('transactions.allTypes'),
+                  t('transactions.purchase'),
+                  t('transactions.withdrawal'),
+                  t('transactions.payment'),
+                  t('transactions.refund'),
+                  t('transactions.transfer'),
+                ]}
+                optionValues={['all', 'purchase', 'withdrawal', 'payment', 'refund', 'transfer']}
+                placeholder={t('common.search')}
+                noMatchesText={t('common.noMatches')}
+                aria-label={t('transactions.filterByType')}
+              />
             </div>
             <div className="flex items-end">
               <button
@@ -393,7 +398,7 @@ export default function TransactionsPage() {
                         <td className="text-right">
                           <span className="transaction-amount" data-type={txn.transaction_type}>
                             {isExpense ? '-' : '+'}
-                          {Number(txn.amount).toFixed(2)} {txn.currency}
+                          {formatAmount(txn.amount)} {txn.currency}
                           </span>
                         </td>
                         <td className="text-center">

@@ -65,7 +65,8 @@ class Card(models.Model):
     # Credit Card Management Fields
     statement_date = models.IntegerField(null=True, blank=True, help_text='Day of month for statement (1-31)')
     payment_due_date = models.IntegerField(null=True, blank=True, help_text='Day of month for payment due (1-31)')
-    minimum_payment = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    minimum_payment = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, help_text='Fixed minimum amount (optional if percentage set)')
+    minimum_payment_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text='Min payment as % of amount due (e.g. 5 for 5%), varies by bank')
     credit_limit = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, help_text='Total credit limit')
     current_balance = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, help_text='Current outstanding balance')
     

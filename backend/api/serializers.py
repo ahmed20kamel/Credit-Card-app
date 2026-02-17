@@ -40,7 +40,7 @@ class CardSerializer(serializers.ModelSerializer):
             'id', 'card_name', 'bank_name', 'card_type', 'card_network',
             'card_last_four', 'expiry_month', 'expiry_year', 'notes',
             'color_hex', 'is_favorite', 'available_balance', 'balance_currency',
-            'statement_date', 'payment_due_date', 'minimum_payment',
+            'statement_date', 'payment_due_date', 'minimum_payment', 'minimum_payment_percentage',
             'credit_limit', 'current_balance',
             'created_at', 'updated_at',
             'card_number', 'cardholder_name', 'cvv', 'iban'
@@ -72,26 +72,38 @@ class CardSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context['request'].user
 
-        card_number = validated_data.pop('card_number', '')
+        card_number = validated_data.pop('card_number', '') or ''
         cardholder_name = validated_data.pop('cardholder_name', None)
         cvv = validated_data.pop('cvv', None)
         iban = validated_data.pop('iban', None)
-        
+
+        # Ensure strings for encryption (API may send numbers)
+        card_number = str(card_number).strip() if card_number is not None else ''
+        cardholder_name = str(cardholder_name).strip() if cardholder_name else None
+        cvv = str(cvv).strip() if cvv else None
+        iban = str(iban).strip() if iban else None
+
         if not validated_data.get('card_network') and card_number:
             validated_data['card_network'] = detect_card_network(card_number)
-        
+
         card_last_four = extract_last_four(card_number) if card_number else ''
-        
-        card = Card.objects.create(
-            user=user,
-            card_number_encrypted=encryption_service.encrypt(card_number),
-            card_last_four=card_last_four,
-            cardholder_name_encrypted=encryption_service.encrypt(cardholder_name) if cardholder_name else None,
-            cvv_encrypted=encryption_service.encrypt(cvv) if cvv else None,
-            iban_encrypted=encryption_service.encrypt(iban) if iban else None,
-            **validated_data
-        )
-        return card
+
+        try:
+            card = Card.objects.create(
+                user=user,
+                card_number_encrypted=encryption_service.encrypt(card_number),
+                card_last_four=card_last_four,
+                cardholder_name_encrypted=encryption_service.encrypt(cardholder_name) if cardholder_name else None,
+                cvv_encrypted=encryption_service.encrypt(cvv) if cvv else None,
+                iban_encrypted=encryption_service.encrypt(iban) if iban else None,
+                **validated_data
+            )
+            return card
+        except Exception as e:
+            logger.exception('Card create failed: %s', e)
+            raise serializers.ValidationError(
+                {'detail': f'Could not save card. Please check your data. ({str(e)})'}
+            )
     
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -141,7 +153,7 @@ class CardUpdateSerializer(serializers.ModelSerializer):
             'card_name', 'bank_name', 'card_type', 'card_network',
             'expiry_month', 'expiry_year', 'notes', 'color_hex',
             'is_favorite', 'available_balance', 'balance_currency',
-            'statement_date', 'payment_due_date', 'minimum_payment',
+            'statement_date', 'payment_due_date', 'minimum_payment', 'minimum_payment_percentage',
             'credit_limit', 'current_balance',
             'card_number', 'cardholder_name', 'cvv', 'iban'
         ]
@@ -235,7 +247,8 @@ class TransactionSerializer(serializers.ModelSerializer):
         return value.upper() if value else value
 
     def create(self, validated_data):
-        user = self.context['request'].user
+        # user can come from save(user=request.user) or context; avoid duplicate in create()
+        user = validated_data.pop('user', None) or self.context['request'].user
         card_id = validated_data.pop('card_id', None)
 
         # Convert transaction_date string to datetime if needed

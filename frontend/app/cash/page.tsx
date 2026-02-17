@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
+import { formatAmount } from '@/lib/formatNumber';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { useAuthStore } from '@/app/store/authStore';
 import { cashAPI } from '@/app/api/cash';
 import toast from 'react-hot-toast';
@@ -146,7 +148,7 @@ export default function CashPage() {
             {t('cash.totalBalance') || 'Total Cash Balance'}
           </div>
           <div className="cash-balance-amount">
-            {loading ? '...' : `${balance.toFixed(2)} ${balanceCurrency}`}
+            {loading ? '...' : `${formatAmount(balance)} ${balanceCurrency}`}
           </div>
         </div>
 
@@ -223,16 +225,13 @@ export default function CashPage() {
                 {/* Currency */}
                 <div className="form-group">
                   <label>{t('cash.currency') || 'Currency'}</label>
-                  <select
+                  <SearchableSelect
                     value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                  >
-                    <option value="AED">AED</option>
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                    <option value="SAR">SAR</option>
-                  </select>
+                    onChange={setCurrency}
+                    options={['AED', 'USD', 'EUR', 'GBP', 'SAR']}
+                    placeholder={t('common.search')}
+                    noMatchesText={t('common.noMatches')}
+                  />
                 </div>
               </div>
 
@@ -370,7 +369,7 @@ export default function CashPage() {
                         color: isIncome ? 'var(--success)' : 'var(--danger)',
                       }}
                     >
-                      {isIncome ? '+' : '-'}{Number(entry.amount).toFixed(2)} {entry.currency}
+                      {isIncome ? '+' : '-'}{formatAmount(entry.amount)} {entry.currency}
                     </span>
                     <button
                       onClick={() => handleDelete(entry.id)}

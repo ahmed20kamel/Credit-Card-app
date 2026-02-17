@@ -12,7 +12,7 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
-  const { t, isRTL } = useTranslations();
+  const { t } = useTranslations();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<'light' | 'dark'>('light');
   const menuRef = useRef<HTMLDivElement>(null);
@@ -111,7 +111,6 @@ export default function Navbar() {
                   }}
                   className="user-menu-item"
                   role="menuitem"
-                  style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                 >
                   <span>{t('common.settings') || 'Settings'}</span>
                 </button>
@@ -119,7 +118,6 @@ export default function Navbar() {
                   onClick={handleLogout}
                   className="user-menu-item user-menu-item-danger"
                   role="menuitem"
-                  style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                 >
                   <LogOut size={16} />
                   <span>{t('navigation.logout')}</span>

@@ -7,6 +7,7 @@ import { useAuthStore } from '@/app/store/authStore';
 import { transactionsAPI } from '@/app/api/transactions';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
+import { formatAmount, formatPercent } from '@/lib/formatNumber';
 import { getErrorMessage } from '@/lib/errors';
 import toast from 'react-hot-toast';
 import type { Transaction, MonthlySummary, MonthlyChartData, CategoryChartData } from '@/types';
@@ -146,7 +147,7 @@ export default function DashboardPage() {
               <div className="summary-content">
                 <div className="summary-label">{t('dashboard.totalSpent')}</div>
                 <div className="summary-value">
-                  {summary.total_spent?.toFixed(2) || '0.00'} <span className="summary-currency">{summary.currency || 'AED'}</span>
+                  {formatAmount(summary.total_spent ?? 0)} <span className="summary-currency">{summary.currency || 'AED'}</span>
                 </div>
               </div>
               <div className="summary-icon">
@@ -158,7 +159,7 @@ export default function DashboardPage() {
               <div className="summary-content">
                 <div className="summary-label">{t('dashboard.totalIncome')}</div>
                 <div className="summary-value">
-                  {summary.total_income?.toFixed(2) || '0.00'} <span className="summary-currency">{summary.currency || 'AED'}</span>
+                  {formatAmount(summary.total_income ?? 0)} <span className="summary-currency">{summary.currency || 'AED'}</span>
                 </div>
               </div>
               <div className="summary-icon">
@@ -170,7 +171,7 @@ export default function DashboardPage() {
               <div className="summary-content">
                 <div className="summary-label">{t('dashboard.net')}</div>
                 <div className="summary-value">
-                  {summary.net?.toFixed(2) || '0.00'} <span className="summary-currency">{summary.currency || 'AED'}</span>
+                  {formatAmount(summary.net ?? 0)} <span className="summary-currency">{summary.currency || 'AED'}</span>
                 </div>
               </div>
               <div className="summary-icon">
@@ -217,7 +218,7 @@ export default function DashboardPage() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={(props) => `${props.name ?? ''} ${(((props.percent as number) ?? 0) * 100).toFixed(0)}%`}
+                      label={(props) => `${props.name ?? ''} ${formatPercent(((props.percent as number) ?? 0) * 100, 0)}`}
                       outerRadius={80}
                       fill="#888"
                       dataKey="value"
@@ -278,7 +279,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className={`recent-transaction-amount ${isExpense ? 'expense' : 'income'}`}>
-                      {isExpense ? '-' : '+'}{Number(txn.amount).toFixed(2)} {txn.currency}
+                      {isExpense ? '-' : '+'}{formatAmount(txn.amount)} {txn.currency}
                     </div>
                   </div>
                 );

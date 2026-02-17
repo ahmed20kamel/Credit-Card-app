@@ -16,7 +16,7 @@ interface BreadcrumbItem {
 
 export default function Breadcrumbs() {
   const pathname = usePathname();
-  const { t, isRTL } = useTranslations();
+  const { t } = useTranslations();
   const [cardName, setCardName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function Breadcrumbs() {
     'dashboard': t('navigation.dashboard'),
     'cards': t('navigation.cards'),
     'transactions': t('navigation.transactions'),
-    'sms-parser': 'SMS Parser',
+    'sms-parser': t('navigation.smsParser'),
     'new': t('common.add'),
     'edit': t('common.edit'),
   };
@@ -94,9 +94,9 @@ export default function Breadcrumbs() {
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
 
-    // Special handling for sms-parser
+    // Special handling for sms-parser (use translation)
     if (path === 'sms-parser') {
-      label = 'SMS Parser';
+      label = t('navigation.smsParser');
     }
 
     breadcrumbs.push({
@@ -146,11 +146,7 @@ export default function Breadcrumbs() {
               </Link>
             )}
             {!isLast && (
-              <ChevronRight 
-                size={16} 
-                className="breadcrumb-separator"
-                style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }}
-              />
+              <ChevronRight size={16} className="breadcrumb-separator" />
             )}
           </div>
         );

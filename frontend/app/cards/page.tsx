@@ -7,6 +7,7 @@ import { cardsAPI, Card } from '@/app/api/cards';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
+import { formatAmount, formatPercent } from '@/lib/formatNumber';
 import toast from 'react-hot-toast';
 import { Plus, CreditCard as CreditCardIcon, CheckSquare, Square, Copy, Check } from 'lucide-react';
 import { getCardUrl } from '@/lib/utils';
@@ -66,9 +67,10 @@ export default function CardsPage() {
         return next;
       });
       // Update card in list to remove revealed data
-      setCards(prev => prev.map(c => c.id === cardId ? { 
-        ...c, 
+      setCards(prev => prev.map(c => c.id === cardId ? {
+        ...c,
         card_number: undefined,
+        cardholder_name: undefined,
         expiry_month: undefined,
         expiry_year: undefined,
         cvv: undefined
@@ -76,9 +78,10 @@ export default function CardsPage() {
     } else {
       try {
         const cardData = await cardsAPI.get(cardId, true);
-        setCards(prev => prev.map(c => c.id === cardId ? { 
-          ...c, 
+        setCards(prev => prev.map(c => c.id === cardId ? {
+          ...c,
           card_number: cardData.card_number,
+          cardholder_name: cardData.cardholder_name,
           expiry_month: cardData.expiry_month,
           expiry_year: cardData.expiry_year,
           cvv: cardData.cvv
@@ -101,9 +104,10 @@ export default function CardsPage() {
       try {
         const cardData = await cardsAPI.get(card.id, true);
         cardNumber = cardData.card_number?.replace(/\s/g, '') || '';
-        setCards(prev => prev.map(c => c.id === card.id ? { 
-          ...c, 
+        setCards(prev => prev.map(c => c.id === card.id ? {
+          ...c,
           card_number: cardData.card_number,
+          cardholder_name: cardData.cardholder_name,
           expiry_month: cardData.expiry_month,
           expiry_year: cardData.expiry_year,
           cvv: cardData.cvv
@@ -350,7 +354,11 @@ export default function CardsPage() {
                       <div className="credit-card-info">
                         <div>
                           <p className="credit-card-label">{t('cards.cardholder')}</p>
-                          <p className="credit-card-holder">{card.card_name.split(' ').map(n => n[0]).join('') || 'CARD'}</p>
+                          <p className="credit-card-holder">
+                            {revealedCards.has(card.id) && card.cardholder_name
+                              ? card.cardholder_name
+                              : '••••'}
+                          </p>
                         </div>
                         <div className="credit-card-expiry">
                           <p className="credit-card-label">{t('cards.expiry')}</p>
@@ -393,7 +401,7 @@ export default function CardsPage() {
                     <div className="mb-4">
                         <div className="flex justify-between card-info-row">
                           <span className="text-secondary">{t('cards.creditLimit')}:</span>
-                          <span className="card-value">{Number(card.credit_limit).toFixed(2)} {card.balance_currency}</span>
+                          <span className="card-value">{formatAmount(card.credit_limit)} {card.balance_currency}</span>
                       </div>
                       {card.current_balance !== null && (
                         <>
@@ -404,8 +412,8 @@ export default function CardsPage() {
                             ></div>
                           </div>
                             <div className="flex justify-between card-info-small">
-                              <span>{t('cards.used')}: {Number(card.current_balance).toFixed(2)}</span>
-                              <span>{t('cards.available')}: {(Number(card.credit_limit) - Number(card.current_balance)).toFixed(2)}</span>
+                              <span>{t('cards.used')}: {formatAmount(card.current_balance)}</span>
+                              <span>{t('cards.available')}: {formatAmount(Number(card.credit_limit) - Number(card.current_balance))}</span>
                             </div>
                         </>
                       )}
@@ -414,7 +422,7 @@ export default function CardsPage() {
                   
                   {card.card_type !== 'credit' && card.available_balance !== null && (
                       <p className="card-balance">
-                        {t('cards.availableBalance')}: <span className="card-value">{Number(card.available_balance).toFixed(2)} {card.balance_currency}</span>
+                        {t('cards.availableBalance')}: <span className="card-value">{formatAmount(card.available_balance)} {card.balance_currency}</span>
                     </p>
                   )}
                   
@@ -422,7 +430,7 @@ export default function CardsPage() {
                       <div className="card-payment-due">
                         <span className="card-payment-label">{t('cards.paymentDue')}:</span> {t('cards.day')} {card.payment_due_date}
                       {card.minimum_payment && (
-                          <span className="card-payment-min">{t('cards.minimumPayment')}: {Number(card.minimum_payment).toFixed(2)} {card.balance_currency}</span>
+                          <span className="card-payment-min">{t('cards.minimumPayment')}: {card.minimum_payment_percentage != null ? `${formatPercent(card.minimum_payment_percentage)} ${t('cards.ofAmountDue')}` : `${formatAmount(card.minimum_payment)} ${card.balance_currency}`}</span>
                       )}
                     </div>
                   )}

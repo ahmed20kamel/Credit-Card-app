@@ -8,7 +8,7 @@ import { useTranslations } from '@/lib/i18n';
 import { getErrorMessage } from '@/lib/errors';
 import { CreditCard } from 'lucide-react';
 
-export default function LoginPage() {
+export default function LoginForm() {
   const router = useRouter();
   const { login, isLoading } = useAuthStore();
   const { t } = useTranslations();
@@ -23,7 +23,9 @@ export default function LoginPage() {
       await login(email, password);
       router.push('/dashboard');
     } catch (err: unknown) {
-      const errorMessage = getErrorMessage(err, t('errors.loginFailed') || 'Login failed. Please check your credentials.');
+      const loginFailedMsg = t('errors.loginFailed');
+      const fallback = 'Login failed. Please check your credentials.';
+      const errorMessage = getErrorMessage(err, (loginFailedMsg && loginFailedMsg !== 'errors.loginFailed' ? loginFailedMsg : fallback));
       setError(errorMessage);
     }
   };
