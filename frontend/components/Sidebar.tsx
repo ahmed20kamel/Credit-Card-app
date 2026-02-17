@@ -1,0 +1,144 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  LayoutDashboard,
+  CreditCard,
+  Receipt,
+  Upload,
+  Banknote,
+  Settings,
+  Menu,
+  X,
+} from 'lucide-react';
+import { useState } from 'react';
+import { useTranslations } from '@/lib/i18n';
+
+interface SidebarProps {
+  userEmail?: string;
+  onLogout: () => void;
+}
+
+export default function Sidebar({ userEmail, onLogout }: SidebarProps) {
+  const pathname = usePathname();
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { t, locale, isRTL } = useTranslations();
+
+  const menuItems = [
+    { href: '/dashboard', label: t('navigation.dashboard'), icon: LayoutDashboard, key: 'dashboard' },
+    { href: '/cards', label: t('navigation.cards'), icon: CreditCard, key: 'cards' },
+    { href: '/transactions', label: t('navigation.transactions'), icon: Receipt, key: 'transactions' },
+    { href: '/sms-parser', label: t('navigation.addTransaction'), icon: Upload, key: 'addTransaction' },
+    { href: '/cash', label: t('navigation.cash') || 'Cash', icon: Banknote, key: 'cash' },
+    { href: '/settings', label: t('common.settings') || 'Settings', icon: Settings, key: 'settings' },
+  ];
+
+  const isActive = (href: string) => {
+    if (href === '/dashboard') {
+      return pathname === '/dashboard' || pathname === '/';
+    }
+    return pathname?.startsWith(href);
+  };
+
+  if (pathname?.startsWith('/login') || pathname?.startsWith('/register')) {
+    return null;
+  }
+
+  return (
+    <>
+      {/* Mobile Menu Button */}
+      <button
+        onClick={() => setIsMobileOpen(!isMobileOpen)}
+        className="mobile-menu-btn"
+        aria-label={isMobileOpen ? 'Close menu' : 'Open menu'}
+        style={{ display: 'none' }}
+      >
+        {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+
+      {/* Sidebar */}
+      <aside
+        className={`sidebar ${isMobileOpen ? 'open' : ''}`}
+        role="navigation"
+        aria-label="Main navigation"
+      >
+        <div className="flex flex-col" style={{ height: '100%' }}>
+          {/* Logo Section */}
+          <div className="sidebar-header">
+            <h1 className="sidebar-title" suppressHydrationWarning>
+              {t('common.appName')}
+            </h1>
+            <p className="sidebar-subtitle" suppressHydrationWarning>
+              {t('common.appDescription')}
+            </p>
+          </div>
+
+          {/* Navigation */}
+          <nav className="sidebar-nav">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsMobileOpen(false)}
+                  className={`nav-item ${active ? 'active' : ''}`}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  <Icon size={20} />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* User Section */}
+          <div style={{
+            padding: 'var(--space-4)',
+            borderTop: '1px solid var(--border-light)',
+            background: 'var(--gray-50)',
+            marginTop: 'auto',
+          }}>
+            <div style={{
+              padding: 'var(--space-3)',
+              background: 'var(--bg)',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+            }}>
+              <p style={{
+                fontSize: '0.75rem',
+                color: 'var(--text-light)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '0.25rem',
+                fontWeight: 600,
+              }}>
+                {t('common.user')}
+              </p>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                color: 'var(--text)',
+              }}>
+                {userEmail || 'User'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Overlay for mobile */}
+      {isMobileOpen && (
+        <div
+          className="sidebar-overlay visible"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+    </>
+  );
+}
