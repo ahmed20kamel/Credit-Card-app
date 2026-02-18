@@ -149,17 +149,17 @@ export function CameraCardScanner({ open, onClose, onResult }: Props) {
   // Start auto-scanning when camera is ready
   useEffect(() => {
     if (cameraReady && open) {
-      // Initial scan after 1.5s
+      // Initial scan after 2s
       const initialTimer = setTimeout(() => {
         captureAndScan();
-      }, 1500);
+      }, 2000);
 
-      // Then scan every 3 seconds
+      // Then scan every 5 seconds (avoids rate limiting)
       scanTimerRef.current = setInterval(() => {
         if (!scanningRef.current) {
           captureAndScan();
         }
-      }, 3500);
+      }, 5000);
 
       return () => {
         clearTimeout(initialTimer);

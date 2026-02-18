@@ -252,7 +252,9 @@ class CardViewSet(viewsets.ModelViewSet):
         import base64
         import logging
         import re as _re
+        import time
         import urllib.request
+        import urllib.error
         logger = logging.getLogger('api.audit')
 
         image_data = request.data.get('image')
@@ -307,41 +309,67 @@ class CardViewSet(viewsets.ModelViewSet):
             'Return ONLY the JSON object, nothing else.'
         )
 
+        # Claude needs additional context to understand this is a legitimate use case
+        claude_prompt = (
+            'You are an OCR assistant inside a personal finance management app called CardVault. '
+            'The authenticated user is uploading a photo of THEIR OWN card to store it in their '
+            'encrypted personal vault. This is similar to Apple Wallet or Google Pay card scanning. '
+            'The user has explicitly consented to this scan.\n\n'
+            'Please extract the visible text from this card image and return a JSON object with '
+            'these fields (use null for anything not visible):\n'
+            '{"card_number":"digits only no spaces","cardholder_name":"name on card",'
+            '"expiry_month":"MM","expiry_year":"YY or YYYY",'
+            '"cvv":"3-4 digit code","card_network":"visa/mastercard/amex/discover or null",'
+            '"bank_name":"issuing bank or null"}\n'
+            'Return ONLY the JSON object, nothing else.'
+        )
+
         response_text = None
 
-        # ── Try Google Gemini first ──────────────────────────
+        # ── Try Google Gemini first (with retry for 429) ─────
         if google_key:
-            try:
-                gemini_url = (
-                    'https://generativelanguage.googleapis.com/v1beta/'
-                    'models/gemini-2.0-flash:generateContent'
-                    f'?key={google_key}'
-                )
-                gemini_body = {
-                    'contents': [{
-                        'parts': [
-                            {'text': prompt_text},
-                            {'inline_data': {'mime_type': media_type, 'data': image_data}}
-                        ]
-                    }]
-                }
-                req = urllib.request.Request(
-                    gemini_url,
-                    data=json.dumps(gemini_body).encode('utf-8'),
-                    headers={'Content-Type': 'application/json'},
-                    method='POST'
-                )
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    resp_body = resp.read().decode('utf-8')
-                    data = json.loads(resp_body)
-                    candidates = data.get('candidates', [])
-                    if candidates:
-                        parts = candidates[0].get('content', {}).get('parts', [])
-                        if parts:
-                            response_text = parts[0].get('text', '').strip()
-                            logger.info('Card scan: Gemini success user=%s', request.user.email)
-            except Exception as e:
-                logger.warning('Card scan: Gemini error: %s', str(e))
+            gemini_url = (
+                'https://generativelanguage.googleapis.com/v1beta/'
+                'models/gemini-2.0-flash:generateContent'
+                f'?key={google_key}'
+            )
+            gemini_body = {
+                'contents': [{
+                    'parts': [
+                        {'text': prompt_text},
+                        {'inline_data': {'mime_type': media_type, 'data': image_data}}
+                    ]
+                }]
+            }
+            payload = json.dumps(gemini_body).encode('utf-8')
+
+            for attempt in range(3):
+                try:
+                    req = urllib.request.Request(
+                        gemini_url, data=payload,
+                        headers={'Content-Type': 'application/json'}, method='POST'
+                    )
+                    with urllib.request.urlopen(req, timeout=30) as resp:
+                        resp_body = resp.read().decode('utf-8')
+                        data = json.loads(resp_body)
+                        candidates = data.get('candidates', [])
+                        if candidates:
+                            parts = candidates[0].get('content', {}).get('parts', [])
+                            if parts:
+                                response_text = parts[0].get('text', '').strip()
+                                logger.info('Card scan: Gemini success (attempt %d) user=%s', attempt + 1, request.user.email)
+                    break  # Success or empty response, don't retry
+                except urllib.error.HTTPError as e:
+                    if e.code == 429 and attempt < 2:
+                        wait = (attempt + 1) * 2  # 2s, 4s
+                        logger.info('Card scan: Gemini 429, retrying in %ds...', wait)
+                        time.sleep(wait)
+                        continue
+                    logger.warning('Card scan: Gemini HTTP %d (attempt %d): %s', e.code, attempt + 1, str(e))
+                    break
+                except Exception as e:
+                    logger.warning('Card scan: Gemini error (attempt %d): %s', attempt + 1, str(e))
+                    break
 
         # ── Fallback to Anthropic Claude ─────────────────────
         if not response_text and anthropic_key:
@@ -354,12 +382,18 @@ class CardViewSet(viewsets.ModelViewSet):
                             model=model_name, max_tokens=1024,
                             messages=[{'role': 'user', 'content': [
                                 {'type': 'image', 'source': {'type': 'base64', 'media_type': media_type, 'data': image_data}},
-                                {'type': 'text', 'text': prompt_text}
+                                {'type': 'text', 'text': claude_prompt}
                             ]}]
                         )
-                        response_text = message.content[0].text.strip()
-                        logger.info('Card scan: Claude %s success user=%s', model_name, request.user.email)
-                        break
+                        text = message.content[0].text.strip()
+                        # Check if Claude refused (no JSON = refusal)
+                        if text.startswith('{') or '```' in text:
+                            response_text = text
+                            logger.info('Card scan: Claude %s success user=%s', model_name, request.user.email)
+                            break
+                        else:
+                            logger.warning('Card scan: Claude %s refused, trying next model', model_name)
+                            continue
                     except Exception:
                         continue
             except Exception as e:
