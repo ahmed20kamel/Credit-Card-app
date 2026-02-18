@@ -1,6 +1,7 @@
 import csv
 import json
 from io import StringIO
+from django.conf import settings as django_settings
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
@@ -240,6 +241,157 @@ class CardViewSet(viewsets.ModelViewSet):
         text = request.data.get('text', '')
         result = parse_card_text(text)
         return Response(result)
+
+    @action(detail=False, methods=['post'], url_path='scan-image', url_name='scan-image')
+    def scan_card_image(self, request):
+        """
+        Extract card details from a photo using Claude Vision.
+        Accepts base64-encoded image. Image is processed in memory only — never stored.
+        """
+        import base64
+        import logging
+        logger = logging.getLogger('api.audit')
+
+        image_data = request.data.get('image')
+        if not image_data:
+            return Response({'error': 'image is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate and sanitize base64
+        # Strip data URL prefix if present (e.g., "data:image/jpeg;base64,...")
+        media_type = 'image/jpeg'
+        if image_data.startswith('data:'):
+            try:
+                header, image_data = image_data.split(',', 1)
+                # Extract media type from header
+                if 'image/png' in header:
+                    media_type = 'image/png'
+                elif 'image/webp' in header:
+                    media_type = 'image/webp'
+                elif 'image/gif' in header:
+                    media_type = 'image/gif'
+            except ValueError:
+                return Response({'error': 'Invalid image data format'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate it's valid base64
+        try:
+            decoded = base64.b64decode(image_data, validate=True)
+        except Exception:
+            return Response({'error': 'Invalid base64 encoding'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Size limit: 10MB decoded
+        if len(decoded) > 10 * 1024 * 1024:
+            return Response({'error': 'Image too large. Maximum 10MB.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate image magic bytes
+        if not (decoded[:3] == b'\xff\xd8\xff' or  # JPEG
+                decoded[:8] == b'\x89PNG\r\n\x1a\n' or  # PNG
+                decoded[:4] == b'RIFF' or  # WEBP
+                decoded[:6] in (b'GIF87a', b'GIF89a')):  # GIF
+            return Response({'error': 'Invalid image file. Supported: JPEG, PNG, WebP, GIF'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check Anthropic API key is configured
+        api_key = getattr(django_settings, 'ANTHROPIC_API_KEY', '')
+        if not api_key:
+            return Response(
+                {'error': 'Card scanning is not configured. Please set ANTHROPIC_API_KEY.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        # Log scan attempt (no image data logged)
+        logger.info(
+            'Card scan attempt: user=%s ip=%s image_size=%d',
+            request.user.email, request.META.get('REMOTE_ADDR', 'unknown'), len(decoded)
+        )
+
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=api_key)
+
+            message = client.messages.create(
+                model='claude-sonnet-4-20250514',
+                max_tokens=1024,
+                messages=[{
+                    'role': 'user',
+                    'content': [
+                        {
+                            'type': 'image',
+                            'source': {
+                                'type': 'base64',
+                                'media_type': media_type,
+                                'data': image_data,
+                            }
+                        },
+                        {
+                            'type': 'text',
+                            'text': (
+                                'Extract credit/debit card details from this image. '
+                                'Return ONLY a JSON object with these fields (use null for any field you cannot read):\n'
+                                '{\n'
+                                '  "card_number": "full card number with no spaces",\n'
+                                '  "cardholder_name": "name as printed on card",\n'
+                                '  "expiry_month": "MM",\n'
+                                '  "expiry_year": "YY or YYYY",\n'
+                                '  "cvv": "3 or 4 digit code (from back of card)",\n'
+                                '  "card_network": "visa/mastercard/amex/discover or null",\n'
+                                '  "bank_name": "issuing bank name or null"\n'
+                                '}\n'
+                                'Return ONLY the JSON, no markdown, no explanation.'
+                            )
+                        }
+                    ]
+                }]
+            )
+
+            # Parse the response
+            response_text = message.content[0].text.strip()
+            # Remove markdown code fences if present
+            if response_text.startswith('```'):
+                response_text = response_text.split('\n', 1)[-1]
+                if response_text.endswith('```'):
+                    response_text = response_text[:-3].strip()
+
+            result = json.loads(response_text)
+
+            # Sanitize: only return expected fields, strip whitespace
+            allowed_fields = ['card_number', 'cardholder_name', 'expiry_month', 'expiry_year', 'cvv', 'card_network', 'bank_name']
+            sanitized = {}
+            for field in allowed_fields:
+                val = result.get(field)
+                if val and val != 'null':
+                    sanitized[field] = str(val).strip()
+
+            # Auto-detect network from card number if not provided
+            if sanitized.get('card_number') and not sanitized.get('card_network'):
+                from .services import detect_card_network
+                network = detect_card_network(sanitized['card_number'])
+                if network:
+                    sanitized['card_network'] = network
+
+            logger.info(
+                'Card scan success: user=%s fields_extracted=%s',
+                request.user.email, list(sanitized.keys())
+            )
+
+            return Response(sanitized)
+
+        except json.JSONDecodeError:
+            logger.warning('Card scan: Failed to parse AI response for user=%s', request.user.email)
+            return Response(
+                {'error': 'Could not extract card details from image. Please try a clearer photo.'},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+        except anthropic.APIError as e:
+            logger.error('Card scan API error: user=%s error=%s', request.user.email, str(e))
+            return Response(
+                {'error': 'Card scanning service temporarily unavailable. Please try again later.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        except Exception as e:
+            logger.exception('Card scan unexpected error: user=%s', request.user.email)
+            return Response(
+                {'error': 'Failed to process image. Please try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=False, methods=['post'], url_path='parse-sms', url_name='parse-sms')
     def parse_sms(self, request):

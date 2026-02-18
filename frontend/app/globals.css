@@ -3682,6 +3682,218 @@ html[dir="rtl"] .credit-card-form-ltr * {
   /* width handled by content-wrapper */
 }
 
+/* ─── Scan Card Section ─── */
+.scan-card-section {
+  margin-bottom: var(--space-6);
+  padding: var(--space-5);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  transition: border-color 0.2s;
+}
+
+.scan-card-section:hover {
+  border-color: var(--primary);
+}
+
+.scan-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+}
+
+.scan-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.scan-card-title-row svg {
+  color: var(--primary);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.scan-card-title-row h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.scan-card-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.scan-security-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.scan-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.scan-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-4);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scan-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.scan-btn svg {
+  opacity: 0.7;
+}
+
+.scan-btn:hover svg {
+  opacity: 1;
+}
+
+.scan-btn-camera:hover {
+  border-color: var(--primary);
+}
+
+.scan-btn-upload:hover {
+  border-color: var(--primary);
+}
+
+.scan-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+}
+
+.scan-loading p {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+}
+
+.scan-loading-hint {
+  font-size: 0.8rem !important;
+  color: var(--text-secondary) !important;
+  font-weight: 400 !important;
+}
+
+.scan-spinner {
+  color: var(--primary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.scan-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius);
+}
+
+.scan-preview-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scan-preview-close:hover {
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+
+.scan-preview-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #10B981;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.scan-security-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.scan-security-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #10B981;
+}
+
+.hidden-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  .scan-actions {
+    flex-direction: column;
+  }
+
+  .scan-card-header {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+}
+
 .add-card-page .card-preview-section {
   margin-bottom: var(--space-8);
   padding: var(--space-6);

@@ -162,7 +162,21 @@
     "balanceInformation": "Balance Information",
     "notesPlaceholder": "Add any additional notes about this card...",
     "addCardDescription": "Fill in the card details below to add a new card",
-    "cardPreview": "Card Preview"
+    "cardPreview": "Card Preview",
+    "scanCard": "Scan Card",
+    "scanCardDesc": "Take a photo or upload an image of your card to auto-fill details",
+    "scanSecure": "Secure",
+    "takePhoto": "Take Photo",
+    "uploadImage": "Upload Image",
+    "scanning": "Scanning card...",
+    "scanningHint": "Extracting card details from image",
+    "scanComplete": "Scan complete",
+    "scanSuccess": "Card scanned!",
+    "fieldsExtracted": "fields extracted",
+    "scanFailed": "Failed to scan card. Please try a clearer photo.",
+    "scanInvalidFile": "Please select an image file",
+    "scanFileTooLarge": "Image must be under 10MB",
+    "scanSecurityNote": "Your card image is processed securely in memory and never stored. All data is encrypted."
   },
   "transactions": {
     "title": "Transactions",

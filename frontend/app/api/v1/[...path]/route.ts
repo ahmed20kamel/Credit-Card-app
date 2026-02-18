@@ -1,3 +1,6 @@
+// Allow large payloads for card image scanning (base64 images up to ~15MB)
+export const maxDuration = 60;
+
 const BACKEND = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
 
 export async function GET(

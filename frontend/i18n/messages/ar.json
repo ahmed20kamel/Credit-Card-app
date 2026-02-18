@@ -162,7 +162,21 @@
     "balanceInformation": "معلومات الرصيد",
     "notesPlaceholder": "أضف أي ملاحظات إضافية حول هذه البطاقة...",
     "addCardDescription": "املأ تفاصيل البطاقة أدناه لإضافة بطاقة جديدة",
-    "cardPreview": "معاينة البطاقة"
+    "cardPreview": "معاينة البطاقة",
+    "scanCard": "مسح البطاقة",
+    "scanCardDesc": "التقط صورة أو ارفع صورة لبطاقتك لملء البيانات تلقائياً",
+    "scanSecure": "آمن",
+    "takePhoto": "التقط صورة",
+    "uploadImage": "ارفع صورة",
+    "scanning": "جاري مسح البطاقة...",
+    "scanningHint": "استخراج بيانات البطاقة من الصورة",
+    "scanComplete": "اكتمل المسح",
+    "scanSuccess": "تم مسح البطاقة!",
+    "fieldsExtracted": "حقول تم استخراجها",
+    "scanFailed": "فشل مسح البطاقة. حاول بصورة أوضح.",
+    "scanInvalidFile": "يرجى اختيار ملف صورة",
+    "scanFileTooLarge": "حجم الصورة يجب أن يكون أقل من 10 ميجابايت",
+    "scanSecurityNote": "يتم معالجة صورة بطاقتك بأمان في الذاكرة ولا يتم تخزينها أبداً. جميع البيانات مشفرة."
   },
   "transactions": {
     "title": "المعاملات",

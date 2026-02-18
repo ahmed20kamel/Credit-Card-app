@@ -43,4 +43,18 @@ export const cardsAPI = {
     const response = await api.post('/cards/parse-sms', data);
     return response.data;
   },
+
+  scanCardImage: async (imageBase64: string): Promise<{
+    card_number?: string;
+    cardholder_name?: string;
+    expiry_month?: string;
+    expiry_year?: string;
+    cvv?: string;
+    card_network?: string;
+    bank_name?: string;
+    error?: string;
+  }> => {
+    const response = await api.post('/cards/scan-image', { image: imageBase64 });
+    return response.data;
+  },
 };
