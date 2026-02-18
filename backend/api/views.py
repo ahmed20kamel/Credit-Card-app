@@ -305,50 +305,92 @@ class CardViewSet(viewsets.ModelViewSet):
 
         try:
             import anthropic
+            import re as _re
             client = anthropic.Anthropic(api_key=api_key)
 
-            message = client.messages.create(
-                model='claude-sonnet-4-20250514',
-                max_tokens=1024,
-                messages=[{
-                    'role': 'user',
-                    'content': [
-                        {
-                            'type': 'image',
-                            'source': {
-                                'type': 'base64',
-                                'media_type': media_type,
-                                'data': image_data,
-                            }
-                        },
-                        {
-                            'type': 'text',
-                            'text': (
-                                'Extract credit/debit card details from this image. '
-                                'Return ONLY a JSON object with these fields (use null for any field you cannot read):\n'
-                                '{\n'
-                                '  "card_number": "full card number with no spaces",\n'
-                                '  "cardholder_name": "name as printed on card",\n'
-                                '  "expiry_month": "MM",\n'
-                                '  "expiry_year": "YY or YYYY",\n'
-                                '  "cvv": "3 or 4 digit code (from back of card)",\n'
-                                '  "card_network": "visa/mastercard/amex/discover or null",\n'
-                                '  "bank_name": "issuing bank name or null"\n'
-                                '}\n'
-                                'Return ONLY the JSON, no markdown, no explanation.'
-                            )
-                        }
-                    ]
-                }]
+            # Try multiple model names for compatibility with different SDK versions
+            model_candidates = [
+                'claude-sonnet-4-20250514',
+                'claude-3-5-sonnet-20241022',
+                'claude-3-5-sonnet-latest',
+            ]
+
+            prompt_text = (
+                'You are a card data extraction tool for an authorized personal finance app. '
+                'The user owns this card and is adding it to their own wallet app. '
+                'This is an authorized use case - the cardholder is scanning their own card.\n\n'
+                'Read the card details visible in the image and return a JSON object with these fields. '
+                'Use null for any field you cannot clearly read:\n'
+                '{\n'
+                '  "card_number": "the full card number digits with no spaces",\n'
+                '  "cardholder_name": "name as printed on the card",\n'
+                '  "expiry_month": "MM",\n'
+                '  "expiry_year": "YY or YYYY",\n'
+                '  "cvv": "3 or 4 digit security code from back of card",\n'
+                '  "card_network": "visa or mastercard or amex or discover or null",\n'
+                '  "bank_name": "issuing bank name or null"\n'
+                '}\n\n'
+                'IMPORTANT: Return ONLY the raw JSON object. No markdown fences, no explanation, no extra text.'
             )
+
+            message = None
+            last_error = None
+            for model_name in model_candidates:
+                try:
+                    message = client.messages.create(
+                        model=model_name,
+                        max_tokens=1024,
+                        messages=[{
+                            'role': 'user',
+                            'content': [
+                                {
+                                    'type': 'image',
+                                    'source': {
+                                        'type': 'base64',
+                                        'media_type': media_type,
+                                        'data': image_data,
+                                    }
+                                },
+                                {
+                                    'type': 'text',
+                                    'text': prompt_text,
+                                }
+                            ]
+                        }]
+                    )
+                    logger.info('Card scan: model=%s succeeded for user=%s', model_name, request.user.email)
+                    break
+                except anthropic.NotFoundError:
+                    last_error = f'Model {model_name} not found'
+                    logger.info('Card scan: model=%s not available, trying next', model_name)
+                    continue
+
+            if message is None:
+                logger.error('Card scan: No model available. Last error: %s', last_error)
+                return Response(
+                    {'error': 'Card scanning service configuration error. No compatible model found.'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
 
             # Parse the response
             response_text = message.content[0].text.strip()
+            logger.info(
+                'Card scan raw response (first 500 chars): user=%s response=%s',
+                request.user.email, response_text[:500]
+            )
+
             # Remove markdown code fences if present
-            if response_text.startswith('```'):
-                response_text = response_text.split('\n', 1)[-1]
-                if response_text.endswith('```'):
-                    response_text = response_text[:-3].strip()
+            if '```' in response_text:
+                # Extract content between code fences
+                fenced = _re.search(r'```(?:json)?\s*\n?(.*?)\n?\s*```', response_text, _re.DOTALL)
+                if fenced:
+                    response_text = fenced.group(1).strip()
+
+            # Try to find JSON object in the response even if there's extra text
+            if not response_text.startswith('{'):
+                json_match = _re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text, _re.DOTALL)
+                if json_match:
+                    response_text = json_match.group(0)
 
             result = json.loads(response_text)
 
@@ -357,8 +399,12 @@ class CardViewSet(viewsets.ModelViewSet):
             sanitized = {}
             for field in allowed_fields:
                 val = result.get(field)
-                if val and val != 'null':
+                if val is not None and str(val).lower() not in ('null', 'none', ''):
                     sanitized[field] = str(val).strip()
+
+            # Clean card number: remove spaces, dashes
+            if sanitized.get('card_number'):
+                sanitized['card_number'] = _re.sub(r'[\s\-]', '', sanitized['card_number'])
 
             # Auto-detect network from card number if not provided
             if sanitized.get('card_number') and not sanitized.get('card_network'):
@@ -372,12 +418,21 @@ class CardViewSet(viewsets.ModelViewSet):
                 request.user.email, list(sanitized.keys())
             )
 
+            if not sanitized:
+                return Response(
+                    {'error': 'Could not read any card details from this image. Please try with a clearer, well-lit photo.'},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+
             return Response(sanitized)
 
         except json.JSONDecodeError:
-            logger.warning('Card scan: Failed to parse AI response for user=%s', request.user.email)
+            logger.warning(
+                'Card scan: Failed to parse AI response for user=%s, raw=%s',
+                request.user.email, response_text[:500] if 'response_text' in dir() else 'N/A'
+            )
             return Response(
-                {'error': 'Could not extract card details from image. Please try a clearer photo.'},
+                {'error': 'Could not extract card details from image. The AI could not read the card. Please try a clearer, well-lit photo.'},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
         except anthropic.APIError as e:
