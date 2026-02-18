@@ -6,7 +6,7 @@ import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Upload, Loader2, Shield, X, CheckCircle } from 'lucide-react';
+import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Upload, Loader2, Shield, X, CheckCircle, Smartphone, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CreditCard, type CreditCardValue } from '@/components/ui/CreditCard';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -27,6 +27,7 @@ function NewCardContent() {
   const [scanPreview, setScanPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const cardNumberInputRef = useRef<HTMLInputElement>(null);
 
   const [creditCard, setCreditCard] = useState<CreditCardValue>({
     cardholderName: '',
@@ -234,10 +235,10 @@ function NewCardContent() {
         <div className="card scan-card-section">
           <div className="scan-card-header">
             <div className="scan-card-title-row">
-              <Camera size={22} />
+              <ScanLine size={22} />
               <div>
                 <h3>{t('cards.scanCard') || 'Scan Card'}</h3>
-                <p className="scan-card-subtitle">{t('cards.scanCardDesc') || 'Take a photo or upload an image of your card to auto-fill details'}</p>
+                <p className="scan-card-subtitle">{t('cards.scanCardDesc') || 'Use your browser\'s built-in scanner or upload an image'}</p>
               </div>
             </div>
             <div className="scan-security-badge">
@@ -246,6 +247,32 @@ function NewCardContent() {
             </div>
           </div>
 
+          {/* Method 1: Browser Native Scanner (Primary) */}
+          <div className="scan-method scan-method-primary">
+            <button
+              type="button"
+              className="scan-btn scan-btn-native"
+              onClick={() => {
+                // Focus the card number input to trigger browser's autofill / card scan
+                const ccInput = document.querySelector<HTMLInputElement>('input[name="cc-number"]');
+                if (ccInput) {
+                  ccInput.focus();
+                  ccInput.click();
+                }
+              }}
+            >
+              <div className="scan-btn-icon-wrap">
+                <Smartphone size={28} />
+                <ScanLine size={16} className="scan-btn-overlay-icon" />
+              </div>
+              <div className="scan-btn-text">
+                <span className="scan-btn-label">{t('cards.scanWithBrowser') || 'Scan with Camera'}</span>
+                <span className="scan-btn-hint">{t('cards.scanWithBrowserHint') || 'Tap the card number field below to use your browser\'s card scanner'}</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Method 2: Image Upload OCR (Secondary) */}
           {scanning ? (
             <div className="scan-loading">
               <Loader2 size={32} className="scan-spinner" />
@@ -258,23 +285,28 @@ function NewCardContent() {
               <p className="scan-loading-hint">{t('cards.scanningHint') || 'Extracting card details from image'}</p>
             </div>
           ) : (
-            <div className="scan-actions">
-              <button
-                type="button"
-                className="scan-btn scan-btn-camera"
-                onClick={() => cameraInputRef.current?.click()}
-              >
-                <Camera size={24} />
-                <span>{t('cards.takePhoto') || 'Take Photo'}</span>
-              </button>
-              <button
-                type="button"
-                className="scan-btn scan-btn-upload"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload size={24} />
-                <span>{t('cards.uploadImage') || 'Upload Image'}</span>
-              </button>
+            <div className="scan-method scan-method-secondary">
+              <div className="scan-method-divider">
+                <span>{t('cards.scanOrUpload') || 'or upload an image'}</span>
+              </div>
+              <div className="scan-actions">
+                <button
+                  type="button"
+                  className="scan-btn scan-btn-camera"
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  <Camera size={20} />
+                  <span>{t('cards.takePhoto') || 'Take Photo'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="scan-btn scan-btn-upload"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload size={20} />
+                  <span>{t('cards.uploadImage') || 'Upload Image'}</span>
+                </button>
+              </div>
             </div>
           )}
 

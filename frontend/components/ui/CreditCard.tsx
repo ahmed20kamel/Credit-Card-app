@@ -201,10 +201,13 @@ export function CreditCard({
         <div className="credit-card-input-group">
           <label>{t('cards.cardholderName') || 'Cardholder Name'}</label>
           <input
+            name="cc-name"
+            autoComplete="cc-name"
             value={local.cardholderName}
             onChange={(e) => update({ cardholderName: e.target.value })}
             onFocus={() => setFocused('front')}
             placeholder="John Doe"
+            aria-label="Cardholder name"
           />
           {errors.cardholderName && <p className="credit-card-error">{errors.cardholderName}</p>}
         </div>
@@ -212,6 +215,7 @@ export function CreditCard({
         <div className="credit-card-input-group">
           <label>{t('cards.cardNumber') || 'Card Number'}</label>
           <input
+            name="cc-number"
             type="tel"
             inputMode="numeric"
             pattern="[0-9\s]*"
@@ -233,8 +237,10 @@ export function CreditCard({
           <div className="credit-card-input-group">
             <label>{t('cards.month') || 'Month'}</label>
             <input
+              name="cc-exp-month"
               type="tel"
               inputMode="numeric"
+              autoComplete="cc-exp-month"
               value={local.expiryMonth}
               onChange={(e) => update({ expiryMonth: onlyDigits(e.target.value).slice(0, 2) })}
               onFocus={() => setFocused('front')}
@@ -249,8 +255,10 @@ export function CreditCard({
           <div className="credit-card-input-group">
             <label>{t('cards.year') || 'Year'}</label>
             <input
+              name="cc-exp-year"
               type="tel"
               inputMode="numeric"
+              autoComplete="cc-exp-year"
               value={local.expiryYear}
               onChange={(e) => update({ expiryYear: onlyDigits(e.target.value).slice(0, 4) })}
               onFocus={() => setFocused('front')}
@@ -264,8 +272,10 @@ export function CreditCard({
           <div className="credit-card-input-group">
             <label>{local.cvvLabel ?? cvvLabel}</label>
             <input
+              name="cc-csc"
               type="tel"
               inputMode="numeric"
+              autoComplete="cc-csc"
               value={local.cvv}
               onChange={(e) => update({ cvv: onlyDigits(e.target.value).slice(0, 4) })}
               onFocus={() => setFocused('back')}
