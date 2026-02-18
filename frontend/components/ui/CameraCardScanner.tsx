@@ -1,14 +1,24 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Camera, RotateCcw, Zap, ZapOff, Loader2 } from 'lucide-react';
+import { X, Zap, ZapOff, RotateCcw, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useTranslations } from '@/lib/i18n';
-import { scanCardImage, type CardOcrResult } from '@/lib/cardOcr';
+import { cardsAPI } from '@/app/api/cards';
+
+export type ScanResult = {
+  card_number?: string;
+  cardholder_name?: string;
+  expiry_month?: string;
+  expiry_year?: string;
+  cvv?: string;
+  card_network?: string;
+  bank_name?: string;
+};
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onResult: (result: CardOcrResult) => void;
+  onResult: (result: ScanResult) => void;
 };
 
 export function CameraCardScanner({ open, onClose, onResult }: Props) {
@@ -16,36 +26,34 @@ export function CameraCardScanner({ open, onClose, onResult }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [hasCamera, setHasCamera] = useState(true);
+  const scanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scanningRef = useRef(false);
+
   const [cameraReady, setCameraReady] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [hasCamera, setHasCamera] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [scanCount, setScanCount] = useState(0);
+  const [statusText, setStatusText] = useState('');
+  const [statusType, setStatusType] = useState<'info' | 'error' | 'success'>('info');
   const [torchOn, setTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
-  const [error, setError] = useState('');
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
 
-  const startCamera = useCallback(async (facing: 'environment' | 'user' = 'environment') => {
+  // Start camera
+  const startCamera = useCallback(async (facing: 'environment' | 'user') => {
     setCameraReady(false);
-    setError('');
+    setStatusText('');
 
-    // Stop any existing stream
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
 
     try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: facing,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      });
       streamRef.current = stream;
 
       if (videoRef.current) {
@@ -54,215 +62,225 @@ export function CameraCardScanner({ open, onClose, onResult }: Props) {
         setCameraReady(true);
       }
 
-      // Check torch capability
+      // Check torch
       const track = stream.getVideoTracks()[0];
-      const capabilities = track.getCapabilities?.();
-      if (capabilities && 'torch' in capabilities) {
-        setHasTorch(true);
-      }
-    } catch (err) {
-      console.error('Camera error:', err);
+      const caps = track.getCapabilities?.();
+      setHasTorch(!!(caps && 'torch' in caps));
+    } catch {
       setHasCamera(false);
-      setError(t('cards.cameraNotAvailable') || 'Camera not available. Please check permissions.');
+      setStatusText(t('cards.cameraNotAvailable') || 'Camera not available. Check permissions.');
+      setStatusType('error');
     }
   }, [t]);
 
-  const stopCamera = useCallback(() => {
+  // Stop camera and timers
+  const stopAll = useCallback(() => {
+    if (scanTimerRef.current) {
+      clearInterval(scanTimerRef.current);
+      scanTimerRef.current = null;
+    }
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
+    scanningRef.current = false;
     setCameraReady(false);
     setHasTorch(false);
     setTorchOn(false);
+    setScanning(false);
+    setScanCount(0);
   }, []);
 
+  // Capture frame and send to backend
+  const captureAndScan = useCallback(async () => {
+    if (scanningRef.current || !videoRef.current || !canvasRef.current) return;
+    scanningRef.current = true;
+    setScanning(true);
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { scanningRef.current = false; setScanning(false); return; }
+
+    ctx.drawImage(video, 0, 0);
+
+    try {
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      setScanCount(prev => prev + 1);
+      setStatusText(t('cards.scanningAuto') || 'Scanning...');
+      setStatusType('info');
+
+      const result = await cardsAPI.scanCardImage(dataUrl);
+
+      if (result.error) {
+        setStatusText(t('cards.scanRetrying') || 'Adjusting... Hold card steady');
+        setStatusType('info');
+      } else {
+        const fields = Object.keys(result).filter(k => result[k as keyof typeof result]);
+        if (fields.length > 0) {
+          setStatusText((t('cards.scanSuccess') || 'Card detected!') + ` (${fields.length} ${t('cards.fieldsExtracted') || 'fields'})`);
+          setStatusType('success');
+          // Stop auto-scan and return result
+          if (scanTimerRef.current) {
+            clearInterval(scanTimerRef.current);
+            scanTimerRef.current = null;
+          }
+          setTimeout(() => {
+            onResult(result);
+            onClose();
+          }, 800);
+          return;
+        } else {
+          setStatusText(t('cards.scanRetrying') || 'Adjusting... Hold card steady');
+          setStatusType('info');
+        }
+      }
+    } catch {
+      setStatusText(t('cards.scanRetrying') || 'Retrying...');
+      setStatusType('info');
+    } finally {
+      scanningRef.current = false;
+      setScanning(false);
+    }
+  }, [t, onResult, onClose]);
+
+  // Start auto-scanning when camera is ready
+  useEffect(() => {
+    if (cameraReady && open) {
+      // Initial scan after 1.5s
+      const initialTimer = setTimeout(() => {
+        captureAndScan();
+      }, 1500);
+
+      // Then scan every 3 seconds
+      scanTimerRef.current = setInterval(() => {
+        if (!scanningRef.current) {
+          captureAndScan();
+        }
+      }, 3500);
+
+      return () => {
+        clearTimeout(initialTimer);
+        if (scanTimerRef.current) {
+          clearInterval(scanTimerRef.current);
+          scanTimerRef.current = null;
+        }
+      };
+    }
+  }, [cameraReady, open, captureAndScan]);
+
+  // Open/close camera
   useEffect(() => {
     if (open) {
       startCamera(facingMode);
     } else {
-      stopCamera();
+      stopAll();
     }
-    return () => stopCamera();
-  }, [open, facingMode, startCamera, stopCamera]);
+    return () => stopAll();
+  }, [open, facingMode, startCamera, stopAll]);
 
   const toggleTorch = async () => {
     if (!streamRef.current) return;
     const track = streamRef.current.getVideoTracks()[0];
     try {
-      await track.applyConstraints({
-        advanced: [{ torch: !torchOn } as MediaTrackConstraintSet],
-      });
+      await track.applyConstraints({ advanced: [{ torch: !torchOn } as MediaTrackConstraintSet] });
       setTorchOn(!torchOn);
-    } catch {
-      // Torch not supported
-    }
-  };
-
-  const switchCamera = () => {
-    setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
-  };
-
-  const captureAndScan = async () => {
-    if (!videoRef.current || !canvasRef.current || processing) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-
-    // Capture frame at full resolution
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0);
-
-    setProcessing(true);
-    setProgress(0);
-
-    try {
-      // Convert canvas to blob for OCR
-      const blob = await new Promise<Blob | null>(resolve =>
-        canvas.toBlob(resolve, 'image/jpeg', 0.95)
-      );
-
-      if (!blob) {
-        setError(t('cards.scanFailed') || 'Failed to capture image');
-        setProcessing(false);
-        return;
-      }
-
-      const file = new File([blob], 'card-capture.jpg', { type: 'image/jpeg' });
-      const result = await scanCardImage(file, (p) => setProgress(p));
-
-      const fieldsFound = Object.keys(result).filter(k => result[k as keyof typeof result]);
-
-      if (fieldsFound.length > 0) {
-        onResult(result);
-        onClose();
-      } else {
-        setError(t('cards.scanNoData') || 'Could not read card details. Try adjusting the angle or lighting.');
-      }
-    } catch (err) {
-      console.error('Scan error:', err);
-      setError(t('cards.scanFailed') || 'Failed to scan card.');
-    } finally {
-      setProcessing(false);
-      setProgress(0);
-    }
+    } catch { /* not supported */ }
   };
 
   if (!open) return null;
 
   return (
-    <div className="camera-scanner-overlay">
-      <div className="camera-scanner-modal">
-        {/* Header */}
-        <div className="camera-scanner-header">
-          <h3>{t('cards.scanCard') || 'Scan Card'}</h3>
-          <button className="camera-scanner-close" onClick={onClose} type="button">
-            <X size={24} />
-          </button>
-        </div>
+    <div className="auto-scanner-overlay">
+      <div className="auto-scanner-modal">
+        {/* Close button */}
+        <button className="auto-scanner-close" onClick={onClose} type="button">
+          <X size={24} />
+        </button>
 
-        {/* Camera View */}
-        <div className="camera-scanner-view">
+        {/* Camera */}
+        <div className="auto-scanner-camera">
           {!hasCamera ? (
-            <div className="camera-scanner-error">
-              <Camera size={48} />
-              <p>{error || (t('cards.cameraNotAvailable') || 'Camera not available')}</p>
+            <div className="auto-scanner-no-camera">
+              <AlertCircle size={48} />
+              <p>{statusText}</p>
             </div>
           ) : (
             <>
-              <video
-                ref={videoRef}
-                className="camera-scanner-video"
-                playsInline
-                muted
-                autoPlay
-              />
-              {/* Card Overlay Guide */}
+              <video ref={videoRef} className="auto-scanner-video" playsInline muted autoPlay />
+
+              {/* Card frame overlay */}
               {cameraReady && (
-                <div className="camera-scanner-guide">
-                  <div className="camera-scanner-card-frame">
-                    <div className="camera-frame-corner camera-frame-tl" />
-                    <div className="camera-frame-corner camera-frame-tr" />
-                    <div className="camera-frame-corner camera-frame-bl" />
-                    <div className="camera-frame-corner camera-frame-br" />
+                <div className="auto-scanner-overlay-guide">
+                  <div className="auto-scanner-dim auto-scanner-dim-top" />
+                  <div className="auto-scanner-middle-row">
+                    <div className="auto-scanner-dim auto-scanner-dim-left" />
+                    <div className={`auto-scanner-frame ${scanning ? 'auto-scanner-frame-active' : ''} ${statusType === 'success' ? 'auto-scanner-frame-success' : ''}`}>
+                      {/* Corner markers */}
+                      <div className="auto-frame-corner auto-frame-tl" />
+                      <div className="auto-frame-corner auto-frame-tr" />
+                      <div className="auto-frame-corner auto-frame-bl" />
+                      <div className="auto-frame-corner auto-frame-br" />
+                      {/* Scanning line animation */}
+                      {scanning && <div className="auto-scanner-line" />}
+                    </div>
+                    <div className="auto-scanner-dim auto-scanner-dim-right" />
                   </div>
-                  <p className="camera-scanner-instruction">
-                    {t('cards.scanInstruction') || 'Position your card within the frame'}
-                  </p>
+                  <div className="auto-scanner-dim auto-scanner-dim-bottom" />
                 </div>
               )}
-              {!cameraReady && !error && (
-                <div className="camera-scanner-loading">
-                  <Loader2 size={32} className="scan-spinner" />
-                  <p>{t('common.loading') || 'Loading...'}</p>
+
+              {!cameraReady && (
+                <div className="auto-scanner-loading">
+                  <Loader2 size={36} className="scan-spinner" />
                 </div>
               )}
             </>
           )}
         </div>
 
-        {/* Processing overlay */}
-        {processing && (
-          <div className="camera-scanner-processing">
-            <Loader2 size={40} className="scan-spinner" />
-            <p>{t('cards.scanning') || 'Scanning card...'}</p>
-            {progress > 0 && (
-              <div className="scan-progress-bar" style={{ width: '200px' }}>
-                <div className="scan-progress-fill" style={{ width: `${progress}%` }} />
-              </div>
+        {/* Status bar */}
+        <div className="auto-scanner-status">
+          <div className={`auto-scanner-status-bar ${statusType}`}>
+            {statusType === 'success' ? <CheckCircle size={18} /> :
+             statusType === 'error' ? <AlertCircle size={18} /> :
+             scanning ? <Loader2 size={18} className="scan-spinner" /> : null}
+            <span>
+              {statusText || (t('cards.scanInstruction') || 'Position your card within the frame')}
+            </span>
+          </div>
+
+          {/* Controls */}
+          <div className="auto-scanner-controls">
+            {hasTorch && (
+              <button
+                type="button"
+                className={`auto-scanner-ctrl-btn ${torchOn ? 'active' : ''}`}
+                onClick={toggleTorch}
+              >
+                {torchOn ? <ZapOff size={20} /> : <Zap size={20} />}
+                <span>{torchOn ? 'Flash Off' : 'Flash'}</span>
+              </button>
             )}
-          </div>
-        )}
-
-        {/* Error message */}
-        {error && hasCamera && (
-          <div className="camera-scanner-error-msg">
-            <p>{error}</p>
-            <p className="camera-scanner-error-hint">
-              {t('cards.scanTiltHint') || 'Tilt the card slightly to create shadows on embossed numbers'}
-            </p>
-          </div>
-        )}
-
-        {/* Controls */}
-        <div className="camera-scanner-controls">
-          {hasTorch && (
             <button
               type="button"
-              className={`camera-scanner-btn camera-scanner-btn-secondary ${torchOn ? 'active' : ''}`}
-              onClick={toggleTorch}
-              disabled={processing}
+              className="auto-scanner-ctrl-btn"
+              onClick={() => setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')}
             >
-              {torchOn ? <ZapOff size={20} /> : <Zap size={20} />}
+              <RotateCcw size={20} />
+              <span>{t('cards.switchCamera') || 'Flip'}</span>
             </button>
+          </div>
+
+          {scanCount > 0 && (
+            <p className="auto-scanner-hint">
+              {t('cards.scanTiltHint') || 'Tilt the card slightly for better results'}
+            </p>
           )}
-
-          <button
-            type="button"
-            className="camera-scanner-btn camera-scanner-btn-capture"
-            onClick={captureAndScan}
-            disabled={processing || !cameraReady}
-          >
-            <div className="camera-capture-ring">
-              <Camera size={28} />
-            </div>
-          </button>
-
-          <button
-            type="button"
-            className="camera-scanner-btn camera-scanner-btn-secondary"
-            onClick={switchCamera}
-            disabled={processing}
-          >
-            <RotateCcw size={20} />
-          </button>
         </div>
 
-        {/* Hidden canvas for capture */}
         <canvas ref={canvasRef} style={{ display: 'none' }} />
       </div>
     </div>

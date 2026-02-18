@@ -245,8 +245,9 @@ if not DEBUG and ENCRYPTION_KEY == 'CHANGE-ME-32-byte-key-for-aes256':
         'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
     )
 
-# Anthropic AI settings
+# AI Vision API settings
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
+GOOGLE_API_KEY = config('GOOGLE_API_KEY', default='')
 
 # Security settings for production
 if not DEBUG:

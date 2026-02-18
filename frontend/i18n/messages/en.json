@@ -183,7 +183,10 @@
     "scanNoData": "Could not read card details. Try adjusting the angle or lighting.",
     "cameraNotAvailable": "Camera not available. Please check permissions.",
     "scanInstruction": "Position your card within the frame",
-    "scanTiltHint": "Tilt the card slightly to create shadows on embossed numbers"
+    "scanTiltHint": "Tilt the card slightly to create shadows on embossed numbers",
+    "scanningAuto": "Scanning...",
+    "scanRetrying": "Adjusting... Hold card steady",
+    "switchCamera": "Flip"
   },
   "transactions": {
     "title": "Transactions",

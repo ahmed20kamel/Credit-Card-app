@@ -1,20 +1,19 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Upload, Loader2, Shield, X, CheckCircle, ScanLine } from 'lucide-react';
+import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Shield, X, CheckCircle, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CreditCard, type CreditCardValue } from '@/components/ui/CreditCard';
-import { CameraCardScanner } from '@/components/ui/CameraCardScanner';
+import { CameraCardScanner, type ScanResult } from '@/components/ui/CameraCardScanner';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { UAE_BANKS } from '@/lib/uae-banks';
 import { getErrorMessage } from '@/lib/errors';
 import FormattedNumberInput from '@/components/ui/FormattedNumberInput';
-import { scanCardImage, type CardOcrResult } from '@/lib/cardOcr';
 
 function NewCardContent() {
   const router = useRouter();
@@ -23,12 +22,8 @@ function NewCardContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [cardValid, setCardValid] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState(0);
-  const [scanPreview, setScanPreview] = useState<string | null>(null);
+  const [scanPreview, setScanPreview] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [creditCard, setCreditCard] = useState<CreditCardValue>({
     cardholderName: '',
@@ -62,101 +57,44 @@ function NewCardContent() {
     }
   }, [isAuthenticated, loadUser, router]);
 
-  // Apply OCR result to card fields
-  const applyScanResult = useCallback((result: CardOcrResult) => {
+  // Handle scan result from camera scanner
+  const handleScanResult = useCallback((result: ScanResult) => {
     const updates: Partial<CreditCardValue> = {};
     if (result.card_number) {
-      const formatted = result.card_number.replace(/(\d{4})/g, '$1 ').trim();
-      updates.cardNumber = formatted;
+      updates.cardNumber = result.card_number.replace(/(\d{4})/g, '$1 ').trim();
     }
-    if (result.cardholder_name) {
-      updates.cardholderName = result.cardholder_name;
-    }
-    if (result.expiry_month) {
-      updates.expiryMonth = result.expiry_month.padStart(2, '0');
-    }
+    if (result.cardholder_name) updates.cardholderName = result.cardholder_name;
+    if (result.expiry_month) updates.expiryMonth = result.expiry_month.padStart(2, '0');
     if (result.expiry_year) {
       let year = result.expiry_year;
       if (year.length === 4) year = year.slice(2);
       updates.expiryYear = year;
     }
-    if (result.cvv) {
-      updates.cvv = result.cvv;
-    }
+    if (result.cvv) updates.cvv = result.cvv;
 
     if (Object.keys(updates).length > 0) {
       setCreditCard(prev => ({ ...prev, ...updates }));
     }
 
     const formUpdates: Record<string, string> = {};
-    if (result.card_network) {
-      formUpdates.card_network = result.card_network.toLowerCase();
-    }
+    if (result.card_network) formUpdates.card_network = result.card_network.toLowerCase();
     if (result.bank_name) {
-      const matchedBank = UAE_BANKS.find(bank =>
-        bank.toLowerCase().includes(result.bank_name!.toLowerCase()) ||
-        result.bank_name!.toLowerCase().includes(bank.toLowerCase())
+      const matched = UAE_BANKS.find(b =>
+        b.toLowerCase().includes(result.bank_name!.toLowerCase()) ||
+        result.bank_name!.toLowerCase().includes(b.toLowerCase())
       );
-      formUpdates.bank_name = matchedBank || result.bank_name;
+      formUpdates.bank_name = matched || result.bank_name;
     }
-
     if (Object.keys(formUpdates).length > 0) {
       setFormData(prev => ({ ...prev, ...formUpdates }));
     }
 
+    setScanPreview(true);
     const fieldsFound = Object.keys(result).filter(k => result[k as keyof typeof result]);
-    if (fieldsFound.length > 0) {
-      toast.success(
-        (t('cards.scanSuccess') || 'Card scanned!') + ` ${fieldsFound.length} ` + (t('cards.fieldsExtracted') || 'fields extracted')
-      );
-    }
+    toast.success(
+      (t('cards.scanSuccess') || 'Card scanned!') + ` ${fieldsFound.length} ` + (t('cards.fieldsExtracted') || 'fields')
+    );
   }, [t]);
-
-  // Handle camera scanner result
-  const handleCameraResult = useCallback((result: CardOcrResult) => {
-    setScanPreview('done');
-    applyScanResult(result);
-  }, [applyScanResult]);
-
-  // Handle file upload OCR
-  const handleFileSelect = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast.error(t('cards.scanInvalidFile') || 'Please select an image file');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error(t('cards.scanFileTooLarge') || 'Image must be under 10MB');
-      return;
-    }
-
-    setScanning(true);
-    setScanProgress(0);
-    setError('');
-    setScanPreview(null);
-
-    try {
-      const result = await scanCardImage(file, (progress) => {
-        setScanProgress(progress);
-      });
-
-      setScanPreview('done');
-      applyScanResult(result);
-
-      const fieldsFound = Object.keys(result).filter(k => result[k as keyof typeof result]);
-      if (fieldsFound.length === 0) {
-        toast.error(t('cards.scanNoData') || 'Could not read card details. Please try a clearer photo or enter details manually.');
-      }
-    } catch (err: unknown) {
-      console.error('OCR error:', err);
-      toast.error(t('cards.scanFailed') || 'Failed to scan card. Please try a clearer photo.');
-    } finally {
-      setScanning(false);
-      setScanProgress(0);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      if (cameraInputRef.current) cameraInputRef.current.value = '';
-    }
-  }, [t, applyScanResult]);
 
   if (!isAuthenticated) {
     return null;
@@ -243,7 +181,7 @@ function NewCardContent() {
         <CameraCardScanner
           open={cameraOpen}
           onClose={() => setCameraOpen(false)}
-          onResult={handleCameraResult}
+          onResult={handleScanResult}
         />
 
         {/* Card Scan Section */}
@@ -262,68 +200,24 @@ function NewCardContent() {
             </div>
           </div>
 
-          {/* Method 1: Camera Scanner (Primary) */}
-          <div className="scan-method scan-method-primary">
-            <button
-              type="button"
-              className="scan-btn scan-btn-native"
-              onClick={() => setCameraOpen(true)}
-            >
-              <div className="scan-btn-icon-wrap">
-                <Camera size={28} />
-              </div>
-              <div className="scan-btn-text">
-                <span className="scan-btn-label">{t('cards.scanWithCamera') || 'Scan with Camera'}</span>
-                <span className="scan-btn-hint">{t('cards.scanWithCameraHint') || 'Open camera to scan your card details automatically'}</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Method 2: Image Upload OCR (Secondary) */}
-          {scanning ? (
-            <div className="scan-loading">
-              <Loader2 size={32} className="scan-spinner" />
-              <p>{t('cards.scanning') || 'Scanning card...'}</p>
-              {scanProgress > 0 && (
-                <div className="scan-progress-bar">
-                  <div className="scan-progress-fill" style={{ width: `${scanProgress}%` }} />
-                </div>
-              )}
-              <p className="scan-loading-hint">{t('cards.scanningHint') || 'Extracting card details from image'}</p>
+          {/* Camera Scanner Button */}
+          <button
+            type="button"
+            className="scan-btn scan-btn-native"
+            onClick={() => setCameraOpen(true)}
+          >
+            <div className="scan-btn-icon-wrap">
+              <Camera size={28} />
             </div>
-          ) : (
-            <div className="scan-method scan-method-secondary">
-              <div className="scan-method-divider">
-                <span>{t('cards.scanOrUpload') || 'or upload an image'}</span>
-              </div>
-              <div className="scan-actions">
-                <button
-                  type="button"
-                  className="scan-btn scan-btn-camera"
-                  onClick={() => cameraInputRef.current?.click()}
-                >
-                  <Upload size={20} />
-                  <span>{t('cards.takePhoto') || 'Take Photo'}</span>
-                </button>
-                <button
-                  type="button"
-                  className="scan-btn scan-btn-upload"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload size={20} />
-                  <span>{t('cards.uploadImage') || 'Upload Image'}</span>
-                </button>
-              </div>
+            <div className="scan-btn-text">
+              <span className="scan-btn-label">{t('cards.scanWithCamera') || 'Scan with Camera'}</span>
+              <span className="scan-btn-hint">{t('cards.scanWithCameraHint') || 'Auto-scan your card details using the camera'}</span>
             </div>
-          )}
+          </button>
 
-          {scanPreview && !scanning && (
+          {scanPreview && (
             <div className="scan-preview">
-              <button
-                className="scan-preview-close"
-                onClick={() => setScanPreview(null)}
-                title={t('common.close') || 'Close'}
-              >
+              <button className="scan-preview-close" onClick={() => setScanPreview(false)} title={t('common.close') || 'Close'}>
                 <X size={16} />
               </button>
               <div className="scan-preview-badge">
@@ -335,31 +229,8 @@ function NewCardContent() {
 
           <div className="scan-security-note">
             <Shield size={14} />
-            <span>{t('cards.scanSecurityNote') || 'Your card image is processed locally on your device and never uploaded to any server.'}</span>
+            <span>{t('cards.scanSecurityNote') || 'Card image is processed securely and never stored.'}</span>
           </div>
-
-          {/* Hidden file inputs */}
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden-input"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFileSelect(file);
-            }}
-          />
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            className="hidden-input"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFileSelect(file);
-            }}
-          />
         </div>
 
         {/* Card Preview in Header */}

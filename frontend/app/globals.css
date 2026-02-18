@@ -3982,276 +3982,205 @@ html[dir="rtl"] .credit-card-form-ltr * {
   pointer-events: none;
 }
 
-/* ── Camera Scanner Modal ───────────────────────────── */
+/* ── Auto Card Scanner ───────────────────────────────── */
 
-.camera-scanner-overlay {
+.auto-scanner-overlay {
   position: fixed;
   inset: 0;
   z-index: 10000;
-  background: rgba(0, 0, 0, 0.95);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  background: #000;
 }
 
-.camera-scanner-modal {
+.auto-scanner-modal {
   width: 100%;
-  max-width: 600px;
-  height: 100%;
-  max-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: #000;
-  position: relative;
 }
 
-.camera-scanner-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-  background: rgba(0, 0, 0, 0.8);
-  color: #fff;
-  z-index: 2;
-}
-
-.camera-scanner-header h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0;
-  color: #fff;
-}
-
-.camera-scanner-close {
+.auto-scanner-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
   border: none;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
   color: #fff;
   cursor: pointer;
-  transition: background 0.2s;
+  backdrop-filter: blur(4px);
 }
 
-.camera-scanner-close:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.camera-scanner-view {
+.auto-scanner-camera {
   flex: 1;
   position: relative;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: #111;
 }
 
-.camera-scanner-video {
+.auto-scanner-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.camera-scanner-guide {
+.auto-scanner-loading,
+.auto-scanner-no-camera {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Overlay guide with dimmed areas */
+.auto-scanner-overlay-guide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
   pointer-events: none;
 }
 
-.camera-scanner-card-frame {
-  width: 85%;
-  max-width: 340px;
-  aspect-ratio: 1.586 / 1; /* Standard credit card ratio */
+.auto-scanner-dim {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.auto-scanner-dim-top,
+.auto-scanner-dim-bottom {
+  flex: 1;
+}
+
+.auto-scanner-middle-row {
+  display: flex;
+}
+
+.auto-scanner-dim-left,
+.auto-scanner-dim-right {
+  flex: 1;
+}
+
+/* Card frame */
+.auto-scanner-frame {
+  width: min(85vw, 360px);
+  aspect-ratio: 1.586 / 1;
   position: relative;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 14px;
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-.camera-frame-corner {
+.auto-scanner-frame-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.auto-scanner-frame-success {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.4) !important;
+}
+
+.auto-frame-corner {
   position: absolute;
-  width: 24px;
-  height: 24px;
-  border-color: #fff;
+  width: 28px;
+  height: 28px;
   border-style: solid;
+  border-color: #fff;
   border-width: 0;
+  transition: border-color 0.3s;
 }
 
-.camera-frame-tl {
-  top: -2px;
-  left: -2px;
-  border-top-width: 3px;
-  border-left-width: 3px;
-  border-top-left-radius: 12px;
-}
+.auto-scanner-frame-active .auto-frame-corner { border-color: var(--primary); }
+.auto-scanner-frame-success .auto-frame-corner { border-color: #10b981; }
 
-.camera-frame-tr {
-  top: -2px;
-  right: -2px;
-  border-top-width: 3px;
-  border-right-width: 3px;
-  border-top-right-radius: 12px;
-}
+.auto-frame-tl { top: -2px; left: -2px; border-top-width: 3px; border-left-width: 3px; border-top-left-radius: 14px; }
+.auto-frame-tr { top: -2px; right: -2px; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 14px; }
+.auto-frame-bl { bottom: -2px; left: -2px; border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 14px; }
+.auto-frame-br { bottom: -2px; right: -2px; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 14px; }
 
-.camera-frame-bl {
-  bottom: -2px;
-  left: -2px;
-  border-bottom-width: 3px;
-  border-left-width: 3px;
-  border-bottom-left-radius: 12px;
-}
-
-.camera-frame-br {
-  bottom: -2px;
-  right: -2px;
-  border-bottom-width: 3px;
-  border-right-width: 3px;
-  border-bottom-right-radius: 12px;
-}
-
-.camera-scanner-instruction {
-  margin-top: var(--space-4);
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.85rem;
-  text-align: center;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
-  padding: 6px 16px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: var(--radius-full);
-}
-
-.camera-scanner-loading,
-.camera-scanner-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  color: rgba(255, 255, 255, 0.7);
-  text-align: center;
-  padding: var(--space-6);
-}
-
-.camera-scanner-error svg {
-  opacity: 0.4;
-}
-
-.camera-scanner-processing {
+/* Scanning line animation */
+.auto-scanner-line {
   position: absolute;
-  inset: 0;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  border-radius: 1px;
+  animation: scanLine 2s ease-in-out infinite;
+}
+
+@keyframes scanLine {
+  0%, 100% { top: 10%; opacity: 0; }
+  10% { opacity: 1; }
+  50% { top: 85%; opacity: 1; }
+  60% { opacity: 0; }
+}
+
+/* Status bar */
+.auto-scanner-status {
+  padding: 16px 20px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(8px);
+}
+
+.auto-scanner-status-bar {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  background: rgba(0, 0, 0, 0.75);
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
   color: #fff;
-  z-index: 3;
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.camera-scanner-processing p {
-  font-size: 0.95rem;
-  color: #fff;
+.auto-scanner-status-bar.info { color: rgba(255, 255, 255, 0.8); }
+.auto-scanner-status-bar.error { color: #f87171; background: rgba(239, 68, 68, 0.1); }
+.auto-scanner-status-bar.success { color: #34d399; background: rgba(16, 185, 129, 0.1); }
+
+.auto-scanner-controls {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
 }
 
-.camera-scanner-error-msg {
-  padding: var(--space-3) var(--space-4);
-  background: rgba(239, 68, 68, 0.15);
-  text-align: center;
-}
-
-.camera-scanner-error-msg p {
-  color: #f87171;
-  font-size: 0.85rem;
-  margin: 0;
-}
-
-.camera-scanner-error-hint {
-  color: rgba(255, 255, 255, 0.6) !important;
-  font-size: 0.78rem !important;
-  margin-top: 4px !important;
-}
-
-.camera-scanner-controls {
+.auto-scanner-ctrl-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-6);
-  padding: var(--space-5) var(--space-4);
-  background: rgba(0, 0, 0, 0.85);
-}
-
-.camera-scanner-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s;
-  color: #fff;
 }
 
-.camera-scanner-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+.auto-scanner-ctrl-btn:hover { background: rgba(255, 255, 255, 0.15); }
+.auto-scanner-ctrl-btn.active { background: rgba(250, 204, 21, 0.2); color: #facc15; border-color: rgba(250, 204, 21, 0.3); }
 
-.camera-scanner-btn-secondary {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.camera-scanner-btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.camera-scanner-btn-secondary.active {
-  background: rgba(250, 204, 21, 0.3);
-  color: #facc15;
-}
-
-.camera-scanner-btn-capture {
-  background: transparent;
-  padding: 0;
-}
-
-.camera-capture-ring {
-  width: 68px;
-  height: 68px;
-  border-radius: var(--radius-full);
-  border: 4px solid #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  transition: all 0.15s;
-}
-
-.camera-scanner-btn-capture:hover:not(:disabled) .camera-capture-ring {
-  background: rgba(255, 255, 255, 0.25);
-  transform: scale(1.05);
-}
-
-.camera-scanner-btn-capture:active:not(:disabled) .camera-capture-ring {
-  transform: scale(0.95);
-  background: rgba(255, 255, 255, 0.3);
+.auto-scanner-hint {
+  text-align: center;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 8px;
 }
 
 @media (max-width: 600px) {
-  .scan-actions {
-    flex-direction: column;
-  }
-
   .scan-card-header {
     flex-direction: column;
     gap: var(--space-2);
@@ -4264,10 +4193,6 @@ html[dir="rtl"] .credit-card-form-ltr * {
   .scan-btn-icon-wrap {
     width: 44px;
     height: 44px;
-  }
-
-  .camera-scanner-modal {
-    max-width: 100%;
   }
 }
 
