@@ -1,7 +1,7 @@
 setuptools>=75.0
 Django==4.2.16
 djangorestframework==3.14.0
-djangorestframework-simplejwt==5.3.0
+djangorestframework-simplejwt==5.3.1
 django-cors-headers==4.3.1
 psycopg2-binary==2.9.9
 cryptography>=41.0
