@@ -501,6 +501,8 @@ p {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   text-decoration: none;
   transform-style: preserve-3d;
+  direction: ltr !important;
+  text-align: left;
 }
 
 .credit-card-detail {
@@ -2174,8 +2176,6 @@ html[dir="rtl"] .credit-card-form-ltr * {
 }
 
 [dir="rtl"] .nav-item {
-  flex-direction: row-reverse;
-  justify-content: flex-end;
   text-align: right;
 }
 
@@ -2212,13 +2212,8 @@ html[dir="rtl"] .credit-card-form-ltr * {
 }
 
 [dir="rtl"] .navbar-content {
-  flex-direction: row-reverse;
   padding-right: calc(240px + var(--space-6));
   padding-left: var(--space-6);
-}
-
-[dir="rtl"] .navbar-actions {
-  flex-direction: row-reverse;
 }
 
 [dir="ltr"] .navbar-content {
@@ -2376,142 +2371,8 @@ html[dir="rtl"] .credit-card-form-ltr * {
   border-right-color: var(--success);
 }
 
-/* RTL: Button with icon - flip icon order */
-[dir="rtl"] .btn {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Language option - flip order */
-[dir="rtl"] .language-option {
-  flex-direction: row-reverse;
-  text-align: right;
-}
-
-/* RTL: User menu item - flip icon order */
-[dir="rtl"] .user-menu-item {
-  flex-direction: row-reverse;
-  text-align: right;
-}
-
-/* RTL: Transaction item - flip icon order */
-[dir="rtl"] .transaction-item {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Info card item - flip icon order */
-[dir="rtl"] .info-card-item {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Recent transaction left - flip order */
-[dir="rtl"] .recent-transaction-left {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Page header content - reverse order */
-[dir="rtl"] .page-header-content {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Card header row - reverse order */
-[dir="rtl"] .card-header-row {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Cards actions bar - reverse order */
-[dir="rtl"] .cards-actions-bar {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Form actions - reverse order */
-[dir="rtl"] .form-actions {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Bulk actions bar - reverse order */
-[dir="rtl"] .bulk-actions-bar {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Bulk actions info - reverse order */
-[dir="rtl"] .bulk-actions-info {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Bulk actions buttons - reverse order */
-[dir="rtl"] .bulk-actions-buttons {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Page header actions - reverse order */
-[dir="rtl"] .page-header-actions {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Usage header - reverse order */
-[dir="rtl"] .usage-header {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Payment due card - reverse order */
-[dir="rtl"] .payment-due-card {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Transaction main - reverse order */
-[dir="rtl"] .transaction-main {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Card select label - reverse order */
-[dir="rtl"] .card-select-label {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Card compact header - reverse order */
-[dir="rtl"] .card-compact-header {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Parsed preview header - reverse order */
-[dir="rtl"] .parsed-preview-header {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Auto-create header - reverse order */
-[dir="rtl"] .auto-create-header {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Form label row - reverse order */
-[dir="rtl"] .form-label-row {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Credit card front header - reverse order */
-[dir="rtl"] .credit-card-front-header {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Credit card front footer - reverse order */
-[dir="rtl"] .credit-card-front-footer {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Credit card back CVV section - reverse order */
-[dir="rtl"] .credit-card-back-cvv-section {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Credit card info - reverse order */
-[dir="rtl"] .credit-card-info {
-  flex-direction: row-reverse;
-}
-
-/* RTL: Credit card number wrapper - reverse order */
-[dir="rtl"] .credit-card-number-wrapper {
-  flex-direction: row-reverse;
-}
+/* RTL: flex-direction is handled automatically by direction: rtl on * */
+/* No manual flex-direction: row-reverse needed - direction: rtl already reverses flex layout */
 
 /* RTL: Table text alignment */
 [dir="rtl"] th,
@@ -2668,13 +2529,7 @@ html[dir="rtl"] .credit-card-form-ltr * {
 }
 
 [dir="rtl"] .breadcrumbs {
-  flex-direction: row-reverse;
-  justify-content: flex-start;
   text-align: right;
-}
-
-[dir="rtl"] .breadcrumb-item {
-  flex-direction: row-reverse;
 }
 
 [dir="rtl"] .breadcrumb-separator {
@@ -5907,8 +5762,8 @@ html[dir="rtl"] .credit-card-form-ltr * {
 
 .credit-card.off-white {
   background: linear-gradient(135deg, #FAFAF9 0%, #F5F5F4 50%, #E7E5E4 100%) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border) !important;
+  color: #1C1917 !important;
+  border: 1px solid #D6D3D1 !important;
 }
 
 .credit-card.off-white .credit-card-bank,
@@ -5916,13 +5771,12 @@ html[dir="rtl"] .credit-card-form-ltr * {
 .credit-card.off-white .credit-card-number,
 .credit-card.off-white .credit-card-holder,
 .credit-card.off-white .credit-card-expiry-value,
-.credit-card.off-white .credit-card-label,
 .credit-card.off-white .credit-card-cvv-value {
-  color: var(--text) !important;
+  color: #1C1917 !important;
 }
 
 .credit-card.off-white .credit-card-label {
-  color: var(--text-secondary) !important;
+  color: #78716C !important;
 }
 
 .credit-card.off-white .credit-card-reveal-btn {
@@ -5939,12 +5793,43 @@ html[dir="rtl"] .credit-card-form-ltr * {
 .credit-card.off-white .credit-card-copy-btn {
   background: rgba(107, 44, 145, 0.1) !important;
   border: 1px solid rgba(107, 44, 145, 0.3) !important;
-  color: var(--primary) !important;
+  color: #6B2C91 !important;
 }
 
 .credit-card.off-white .credit-card-copy-btn:hover {
   background: rgba(107, 44, 145, 0.2) !important;
   border-color: rgba(107, 44, 145, 0.5) !important;
+}
+
+/* Dark mode: off-white card becomes dark card */
+[data-theme="dark"] .credit-card.off-white {
+  background: linear-gradient(135deg, #1C1917 0%, #292524 50%, #3D3835 100%) !important;
+  color: #FAFAF9 !important;
+  border-color: #57534E !important;
+}
+
+[data-theme="dark"] .credit-card.off-white .credit-card-bank,
+[data-theme="dark"] .credit-card.off-white .credit-card-name-text,
+[data-theme="dark"] .credit-card.off-white .credit-card-number,
+[data-theme="dark"] .credit-card.off-white .credit-card-holder,
+[data-theme="dark"] .credit-card.off-white .credit-card-expiry-value,
+[data-theme="dark"] .credit-card.off-white .credit-card-cvv-value {
+  color: #FAFAF9 !important;
+}
+
+[data-theme="dark"] .credit-card.off-white .credit-card-label {
+  color: #A8A29E !important;
+}
+
+[data-theme="dark"] .credit-card.off-white .credit-card-copy-btn {
+  background: rgba(168, 79, 168, 0.15) !important;
+  border-color: rgba(168, 79, 168, 0.3) !important;
+  color: #A855C7 !important;
+}
+
+[data-theme="dark"] .credit-card.off-white .credit-card-copy-btn:hover {
+  background: rgba(168, 79, 168, 0.25) !important;
+  border-color: rgba(168, 79, 168, 0.5) !important;
 }
 
 /* ============================================
