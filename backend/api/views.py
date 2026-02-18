@@ -252,7 +252,7 @@ class CardViewSet(viewsets.ModelViewSet):
         import base64
         import logging
         import re as _re
-        import requests as http_requests
+        import urllib.request
         logger = logging.getLogger('api.audit')
 
         image_data = request.data.get('image')
@@ -325,17 +325,21 @@ class CardViewSet(viewsets.ModelViewSet):
                         ]
                     }]
                 }
-                resp = http_requests.post(gemini_url, json=gemini_body, timeout=30)
-                if resp.status_code == 200:
-                    data = resp.json()
+                req = urllib.request.Request(
+                    gemini_url,
+                    data=json.dumps(gemini_body).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'},
+                    method='POST'
+                )
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    resp_body = resp.read().decode('utf-8')
+                    data = json.loads(resp_body)
                     candidates = data.get('candidates', [])
                     if candidates:
                         parts = candidates[0].get('content', {}).get('parts', [])
                         if parts:
                             response_text = parts[0].get('text', '').strip()
                             logger.info('Card scan: Gemini success user=%s', request.user.email)
-                else:
-                    logger.warning('Card scan: Gemini HTTP %d: %s', resp.status_code, resp.text[:300])
             except Exception as e:
                 logger.warning('Card scan: Gemini error: %s', str(e))
 
