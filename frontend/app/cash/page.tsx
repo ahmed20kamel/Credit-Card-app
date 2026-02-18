@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { formatAmount } from '@/lib/formatNumber';
+import { formatAmount, currencySymbol } from '@/lib/formatNumber';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { useAuthStore } from '@/app/store/authStore';
 import { cashAPI } from '@/app/api/cash';
@@ -148,7 +148,7 @@ export default function CashPage() {
             {t('cash.totalBalance') || 'Total Cash Balance'}
           </div>
           <div className="cash-balance-amount">
-            {loading ? '...' : `${formatAmount(balance)} ${balanceCurrency}`}
+            {loading ? '...' : `${formatAmount(balance)} ${currencySymbol(balanceCurrency)}`}
           </div>
         </div>
 
@@ -369,7 +369,7 @@ export default function CashPage() {
                         color: isIncome ? 'var(--success)' : 'var(--danger)',
                       }}
                     >
-                      {isIncome ? '+' : '-'}{formatAmount(entry.amount)} {entry.currency}
+                      {isIncome ? '+' : '-'}{formatAmount(entry.amount)} {currencySymbol(entry.currency)}
                     </span>
                     <button
                       onClick={() => handleDelete(entry.id)}

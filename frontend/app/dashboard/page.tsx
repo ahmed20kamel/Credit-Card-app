@@ -7,17 +7,19 @@ import { useAuthStore } from '@/app/store/authStore';
 import { transactionsAPI } from '@/app/api/transactions';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { formatAmount, formatPercent } from '@/lib/formatNumber';
+import { formatAmount, formatPercent, currencySymbol } from '@/lib/formatNumber';
 import { getErrorMessage } from '@/lib/errors';
 import toast from 'react-hot-toast';
 import type { Transaction, MonthlySummary, MonthlyChartData, CategoryChartData } from '@/types';
 import {
   TrendingUp,
   TrendingDown,
-  DollarSign,
+  Wallet,
   ArrowRight,
   Receipt,
   CreditCard,
+  BarChart3,
+  ArrowUpRight,
 } from 'lucide-react';
 import {
   LineChart,
@@ -110,6 +112,24 @@ export default function DashboardPage() {
       .slice(0, 8);
   }, [transactions, t]);
 
+  const stats = useMemo(() => {
+    if (transactions.length === 0) return { avgAmount: 0, maxAmount: 0, cardsUsed: 0, topCategory: '-' };
+
+    const amounts = transactions.map(t => Number(t.amount));
+    const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    const maxAmount = Math.max(...amounts);
+    const cardsUsed = new Set(transactions.filter(t => t.card_id).map(t => t.card_id)).size;
+
+    const categoryCount: Record<string, number> = {};
+    transactions.forEach(t => {
+      const cat = t.category || 'Other';
+      categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+    });
+    const topCategory = Object.entries(categoryCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+
+    return { avgAmount, maxAmount, cardsUsed, topCategory };
+  }, [transactions]);
+
   const recentTransactions = useMemo(() => {
     return [...transactions]
       .sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime())
@@ -147,7 +167,7 @@ export default function DashboardPage() {
               <div className="summary-content">
                 <div className="summary-label">{t('dashboard.totalSpent')}</div>
                 <div className="summary-value">
-                  {formatAmount(summary.total_spent ?? 0)} <span className="summary-currency">{summary.currency || 'AED'}</span>
+                  {formatAmount(summary.total_spent ?? 0)} <span className="summary-currency">{currencySymbol(summary.currency || 'AED')}</span>
                 </div>
               </div>
               <div className="summary-icon">
@@ -159,7 +179,7 @@ export default function DashboardPage() {
               <div className="summary-content">
                 <div className="summary-label">{t('dashboard.totalIncome')}</div>
                 <div className="summary-value">
-                  {formatAmount(summary.total_income ?? 0)} <span className="summary-currency">{summary.currency || 'AED'}</span>
+                  {formatAmount(summary.total_income ?? 0)} <span className="summary-currency">{currencySymbol(summary.currency || 'AED')}</span>
                 </div>
               </div>
               <div className="summary-icon">
@@ -171,11 +191,11 @@ export default function DashboardPage() {
               <div className="summary-content">
                 <div className="summary-label">{t('dashboard.net')}</div>
                 <div className="summary-value">
-                  {formatAmount(summary.net ?? 0)} <span className="summary-currency">{summary.currency || 'AED'}</span>
+                  {formatAmount(summary.net ?? 0)} <span className="summary-currency">{currencySymbol(summary.currency || 'AED')}</span>
                 </div>
               </div>
               <div className="summary-icon">
-                <DollarSign size={24} />
+                <Wallet size={24} />
               </div>
             </div>
           </div>
@@ -242,6 +262,47 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Quick Stats */}
+        {transactions.length > 0 && (
+          <div className="grid grid-4 mb-8">
+            <div className="card" style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
+                {t('dashboard.avgTransaction') || 'Avg Transaction'}
+              </p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text)' }}>
+                {formatAmount(stats.avgAmount)} <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>{currencySymbol('AED')}</span>
+              </p>
+            </div>
+            <div className="card" style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
+                {t('dashboard.largestTransaction') || 'Largest Transaction'}
+              </p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text)' }}>
+                <ArrowUpRight size={18} style={{ verticalAlign: 'middle', color: 'var(--danger)', marginRight: '0.15rem' }} />
+                {formatAmount(stats.maxAmount)} <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>{currencySymbol('AED')}</span>
+              </p>
+            </div>
+            <div className="card" style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
+                {t('dashboard.cardsUsed') || 'Cards Used'}
+              </p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text)' }}>
+                <CreditCard size={18} style={{ verticalAlign: 'middle', color: 'var(--primary)', marginRight: '0.25rem' }} />
+                {stats.cardsUsed}
+              </p>
+            </div>
+            <div className="card" style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
+                {t('dashboard.topCategory') || 'Top Category'}
+              </p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text)' }}>
+                <BarChart3 size={18} style={{ verticalAlign: 'middle', color: 'var(--accent)', marginRight: '0.25rem' }} />
+                {stats.topCategory}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Recent Transactions */}
         {recentTransactions.length > 0 && (
           <div className="card">
@@ -279,7 +340,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className={`recent-transaction-amount ${isExpense ? 'expense' : 'income'}`}>
-                      {isExpense ? '-' : '+'}{formatAmount(txn.amount)} {txn.currency}
+                      {isExpense ? '-' : '+'}{formatAmount(txn.amount)} {currencySymbol(txn.currency)}
                     </div>
                   </div>
                 );

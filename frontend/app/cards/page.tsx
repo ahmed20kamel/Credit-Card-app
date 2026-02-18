@@ -7,7 +7,7 @@ import { cardsAPI, Card } from '@/app/api/cards';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { formatAmount, formatPercent } from '@/lib/formatNumber';
+import { formatAmount, formatPercent, currencySymbol } from '@/lib/formatNumber';
 import toast from 'react-hot-toast';
 import { Plus, CreditCard as CreditCardIcon, CheckSquare, Square, Copy, Check } from 'lucide-react';
 import { getCardUrl } from '@/lib/utils';
@@ -408,7 +408,7 @@ export default function CardsPage() {
                     <div className="mb-4">
                         <div className="flex justify-between card-info-row">
                           <span className="text-secondary">{t('cards.creditLimit')}:</span>
-                          <span className="card-value">{formatAmount(card.credit_limit)} {card.balance_currency}</span>
+                          <span className="card-value">{formatAmount(card.credit_limit)} {currencySymbol(card.balance_currency)}</span>
                       </div>
                       {card.current_balance !== null && (
                         <>
@@ -429,7 +429,7 @@ export default function CardsPage() {
                   
                   {card.card_type !== 'credit' && card.available_balance !== null && (
                       <p className="card-balance">
-                        {t('cards.availableBalance')}: <span className="card-value">{formatAmount(card.available_balance)} {card.balance_currency}</span>
+                        {t('cards.availableBalance')}: <span className="card-value">{formatAmount(card.available_balance)} {currencySymbol(card.balance_currency)}</span>
                     </p>
                   )}
                   
@@ -437,7 +437,7 @@ export default function CardsPage() {
                       <div className="card-payment-due">
                         <span className="card-payment-label">{t('cards.paymentDue')}:</span> {t('cards.day')} {card.payment_due_date}
                       {card.minimum_payment && (
-                          <span className="card-payment-min">{t('cards.minimumPayment')}: {card.minimum_payment_percentage != null ? `${formatPercent(card.minimum_payment_percentage)} ${t('cards.ofAmountDue')}` : `${formatAmount(card.minimum_payment)} ${card.balance_currency}`}</span>
+                          <span className="card-payment-min">{t('cards.minimumPayment')}: {card.minimum_payment_percentage != null ? `${formatPercent(card.minimum_payment_percentage)} ${t('cards.ofAmountDue')}` : `${formatAmount(card.minimum_payment)} ${currencySymbol(card.balance_currency)}`}</span>
                       )}
                     </div>
                   )}

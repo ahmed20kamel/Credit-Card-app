@@ -7,7 +7,7 @@ import { cardsAPI, Card } from '@/app/api/cards';
 import { transactionsAPI, Transaction } from '@/app/api/transactions';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { formatAmount, formatPercent } from '@/lib/formatNumber';
+import { formatAmount, formatPercent, currencySymbol } from '@/lib/formatNumber';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
@@ -350,7 +350,7 @@ export default function CardDetailPage() {
                             <p className="transaction-merchant">{txn.merchant_name || txn.description || t('transactions.transaction')}</p>
                             <p className={`transaction-amount ${isExpense ? 'transaction-amount-expense' : 'transaction-amount-income'}`}>
                               {isExpense ? '-' : '+'}
-                              {formatAmount(txn.amount)} {txn.currency}
+                              {formatAmount(txn.amount)} {currencySymbol(txn.currency)}
                             </p>
                           </div>
                           <div className="transaction-meta">
@@ -382,19 +382,19 @@ export default function CardDetailPage() {
                 {isCredit && card.credit_limit && (
                   <div className="summary-item">
                     <p className="summary-item-label">{t('cards.creditLimit')}</p>
-                    <p className="summary-item-value">{formatAmount(card.credit_limit)} {card.balance_currency}</p>
+                    <p className="summary-item-value">{formatAmount(card.credit_limit)} {currencySymbol(card.balance_currency)}</p>
                   </div>
                 )}
                 {card.current_balance !== null && (
                   <div className="summary-item">
                     <p className="summary-item-label">{t('cards.outstanding')}</p>
-                    <p className="summary-item-value summary-item-value-danger">{formatAmount(card.current_balance)} {card.balance_currency}</p>
+                    <p className="summary-item-value summary-item-value-danger">{formatAmount(card.current_balance)} {currencySymbol(card.balance_currency)}</p>
                   </div>
                 )}
                 {card.available_balance !== null && (
                   <div className="summary-item">
                     <p className="summary-item-label">{t('cards.available')}</p>
-                    <p className="summary-item-value summary-item-value-success">{formatAmount(card.available_balance)} {card.balance_currency}</p>
+                    <p className="summary-item-value summary-item-value-success">{formatAmount(card.available_balance)} {currencySymbol(card.balance_currency)}</p>
                   </div>
                 )}
                 {isCredit && card.credit_limit && card.current_balance !== null && (
@@ -417,7 +417,7 @@ export default function CardDetailPage() {
                 {card.minimum_payment != null && (
                   <div className="summary-item">
                     <p className="summary-item-label">{t('cards.minimumPayment')}</p>
-                    <p className="summary-item-value">{card.minimum_payment_percentage != null ? `${formatPercent(card.minimum_payment_percentage)} ${t('cards.ofAmountDue')}` : `${formatAmount(card.minimum_payment)} ${card.balance_currency}`}</p>
+                    <p className="summary-item-value">{card.minimum_payment_percentage != null ? `${formatPercent(card.minimum_payment_percentage)} ${t('cards.ofAmountDue')}` : `${formatAmount(card.minimum_payment)} ${currencySymbol(card.balance_currency)}`}</p>
                   </div>
                 )}
               </div>

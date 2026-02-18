@@ -8,7 +8,7 @@ import { transactionsAPI, Transaction } from '@/app/api/transactions';
 import { cardsAPI, Card } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { formatAmount } from '@/lib/formatNumber';
+import { formatAmount, currencySymbol } from '@/lib/formatNumber';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { 
@@ -19,7 +19,7 @@ import {
   TrendingDown,
   Calendar,
   CreditCard,
-  DollarSign,
+  Wallet,
   RefreshCw,
   Trash2,
   CheckSquare,
@@ -186,11 +186,11 @@ export default function TransactionsPage() {
             <div className="summary-content">
               <div className="summary-label">{t('transactions.totalBalance')}</div>
               <div className="summary-value">
-                {totalAmount >= 0 ? '+' : ''}{formatAmount(totalAmount)} <span className="summary-currency">AED</span>
+                {totalAmount >= 0 ? '+' : ''}{formatAmount(totalAmount)} <span className="summary-currency">{currencySymbol('AED')}</span>
               </div>
             </div>
             <div className="summary-icon">
-              <DollarSign size={28} />
+              <Wallet size={28} />
             </div>
             <div className="summary-content text-right">
               <div className="summary-label">{t('transactions.totalTransactions')}</div>
@@ -290,7 +290,7 @@ export default function TransactionsPage() {
         ) : transactions.length === 0 ? (
           <div className="card">
             <EmptyState
-              icon={DollarSign}
+              icon={Wallet}
               title={t('transactions.noTransactions') || 'No Transactions Found'}
               description={t('transactions.noTransactionsDescription') || 'Start by adding your first transaction'}
               action={{
@@ -398,7 +398,7 @@ export default function TransactionsPage() {
                         <td className="text-right">
                           <span className="transaction-amount" data-type={txn.transaction_type}>
                             {isExpense ? '-' : '+'}
-                          {formatAmount(txn.amount)} {txn.currency}
+                          {formatAmount(txn.amount)} {currencySymbol(txn.currency)}
                           </span>
                         </td>
                         <td className="text-center">

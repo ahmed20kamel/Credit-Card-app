@@ -8,6 +8,7 @@ import { transactionsAPI } from '@/app/api/transactions';
 import api from '@/app/api/client';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
+import { currencySymbol } from '@/lib/formatNumber';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import toast from 'react-hot-toast';
 import { 
@@ -92,30 +93,39 @@ export default function TransactionImporterPage() {
       const response = await api.post('/cards/parse-sms/', {
         sms_body: smsBody,
         sender: sender || 'Unknown',
-        auto_create: false, // Always parse first, create separately
+        auto_create: autoCreate,
         card_id: selectedCard || null,
       });
 
       const data = response.data;
-      
+
       if (data.matched_card_id && !selectedCard) {
         setSelectedCard(data.matched_card_id);
       } else if (data.suggested_card_id && !selectedCard) {
         setSelectedCard(data.suggested_card_id);
       }
-      
+
       if (data.error) {
         toast.error(data.error || t('addTransaction.parsingFailed'));
         setParsedData(null);
       } else if (data.duplicate) {
-        toast.error(t('addTransaction.duplicateMessage'));
+        toast.error(t('addTransaction.duplicateMessage') || 'This transaction already exists');
         setParsedData(data);
+      } else if (data.created || data.auto_created) {
+        // Backend already created the transaction - don't create again
+        setParsedData(data);
+        setEditedData(data);
+        toast.success(t('success.transactionCreated'));
+        setSmsBody('');
+        setParsedData(null);
+        setEditedData(null);
+        setSelectedCard('');
       } else {
         setParsedData(data);
         setEditedData(data);
-        
-        // Auto-create if enabled
-        if (autoCreate && !data.duplicate && !data.error) {
+
+        // Auto-create only if backend didn't already create it
+        if (autoCreate && !data.duplicate && !data.error && !data.created) {
           await handleCreateTransaction(data);
         }
       }
@@ -488,7 +498,7 @@ export default function TransactionImporterPage() {
                         <div className="parsed-data-item">
                           <span className="parsed-data-label">{t('transactions.amount')}:</span>
                           <p className="parsed-data-value parsed-data-amount">
-                            {parsedData.amount ? `${parsedData.amount} ${parsedData.currency || 'AED'}` : 'N/A'}
+                            {parsedData.amount ? `${parsedData.amount} ${currencySymbol(parsedData.currency || 'AED')}` : 'N/A'}
                           </p>
                         </div>
                         <div className="parsed-data-item">

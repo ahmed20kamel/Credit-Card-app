@@ -266,14 +266,16 @@ class TransactionSerializer(serializers.ModelSerializer):
             else:
                 validated_data['transaction_date'] = parsed_datetime
         
-        # Get card if card_id provided
+        # Get card if card_id provided - reject if card doesn't exist
         card = None
         if card_id:
+            from .models import Card
             try:
-                from .models import Card
                 card = Card.objects.get(id=card_id, user=user)
             except Card.DoesNotExist:
-                pass  # card will remain None
+                raise serializers.ValidationError(
+                    {'card_id': 'Card not found. Please select a valid card or leave empty.'}
+                )
         
         transaction = Transaction.objects.create(
             user=user,

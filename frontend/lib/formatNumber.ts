@@ -50,3 +50,27 @@ export function formatPercent(value: number | string | null | undefined, decimal
   }).format(num);
   return `${formatted}%`;
 }
+
+/**
+ * Map ISO currency code to its symbol.
+ * Returns the new UAE Dirham symbol (د.إ) for AED.
+ */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  AED: 'د.إ',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  SAR: 'ر.س',
+  EGP: 'ج.م',
+  KWD: 'د.ك',
+  BHD: 'د.ب',
+  QAR: 'ر.ق',
+  OMR: 'ر.ع',
+  JOD: 'د.ا',
+  INR: '₹',
+};
+
+export function currencySymbol(code?: string | null): string {
+  if (!code) return 'د.إ';
+  return CURRENCY_SYMBOLS[code.toUpperCase()] || code;
+}

@@ -289,8 +289,8 @@ class CardViewSet(viewsets.ModelViewSet):
                 except Exception:
                     pass
             
-            # Auto-create transaction if requested OR if card is auto-detected
-            should_auto_create = auto_create or (target_card and parsed.card_last_four)
+            # Auto-create transaction ONLY if explicitly requested by the client
+            should_auto_create = auto_create
             
             if should_auto_create:
                 if target_card:
