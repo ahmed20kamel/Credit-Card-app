@@ -584,6 +584,7 @@ export default function TransactionImporterPage() {
               <div className="image-upload-area">
                 {imagePreview ? (
                   <div className="image-preview-wrapper">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={imagePreview} alt="Preview" className="image-preview" />
                     <button
                       onClick={() => {

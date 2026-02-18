@@ -31,8 +31,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'api',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -45,6 +47,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'api.middleware.RequestIDMiddleware',
 ]
 
 ROOT_URLCONF = 'cardvault.urls'
@@ -99,6 +102,7 @@ else:
                 'PASSWORD': config('POSTGRES_PASSWORD', default='cardvault_dev_pass'),
                 'HOST': POSTGRES_HOST,
                 'PORT': config('POSTGRES_PORT', default='5432'),
+                'CONN_MAX_AGE': 600,
             }
         }
     else:
@@ -162,13 +166,21 @@ REST_FRAMEWORK = {
         'user': '120/minute',
         'login': '5/minute',
     },
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'CardVault API',
+    'DESCRIPTION': 'API for managing credit cards, transactions, and cash entries',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': False,  # set True only if token_blacklist app is installed & migrated
+    'BLACKLIST_AFTER_ROTATION': True,
 }
 
 # CORS Settings
@@ -226,6 +238,13 @@ CORS_ALLOW_METHODS = [
 # Encryption settings
 ENCRYPTION_KEY = config('ENCRYPTION_KEY', default='CHANGE-ME-32-byte-key-for-aes256')
 
+# Fail loudly if using default encryption key in production
+if not DEBUG and ENCRYPTION_KEY == 'CHANGE-ME-32-byte-key-for-aes256':
+    raise ValueError(
+        'ENCRYPTION_KEY must be set to a secure value in production! '
+        'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
+    )
+
 # Anthropic AI settings
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
@@ -239,6 +258,8 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default='True', cast=bool)
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Logging configuration
 LOGGING = {
@@ -266,5 +287,18 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'api.audit': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
+}
+
+# Cache configuration (for login rate limiting)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'cardvault-cache',
+    }
 }

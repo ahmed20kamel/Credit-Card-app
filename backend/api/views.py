@@ -1,10 +1,16 @@
+import csv
+import json
+from io import StringIO
 from rest_framework import viewsets, status
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from django.core.cache import cache
 from django.db.models import Sum, Q, Count
+from django.http import HttpResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
 from .models import Card, Transaction, CashEntry, ChatSession, ChatMessage
@@ -14,6 +20,15 @@ from .serializers import (
 )
 from .services import encryption_service, parse_card_text, update_card_balance
 from .sms_parser import SMSParserEngine
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    rate = '5/minute'
+
+
+# Account lockout constants
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_DURATION = 300  # 5 minutes in seconds
 
 
 @api_view(['POST'])
@@ -49,21 +64,36 @@ def _get_login_data(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
 def login(request):
     try:
         email, password = _get_login_data(request)
-        
+
         if not email or not password:
             return Response({'detail': 'Email and password required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+        # Check for account lockout
+        lockout_key = f'login_attempts_{email}'
+        attempts = cache.get(lockout_key, 0)
+        if attempts >= MAX_LOGIN_ATTEMPTS:
+            return Response(
+                {'detail': 'Account temporarily locked due to too many failed attempts. Please try again later.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
         user = authenticate(request, username=email, password=password)
         if user:
+            # Reset failed attempts on successful login
+            cache.delete(lockout_key)
             refresh = RefreshToken.for_user(user)
             return Response({
                 'access_token': str(refresh.access_token),
                 'refresh_token': str(refresh),
                 'token_type': 'bearer'
             })
+
+        # Increment failed attempts
+        cache.set(lockout_key, attempts + 1, LOCKOUT_DURATION)
         return Response({'detail': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
     except Exception as e:
         import logging
@@ -145,7 +175,7 @@ class CardViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        return Card.objects.filter(user=self.request.user, is_deleted=False)
+        return Card.objects.filter(user=self.request.user)
     
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -157,8 +187,20 @@ class CardViewSet(viewsets.ModelViewSet):
         bank_name = request.query_params.get('bank_name')
         if bank_name:
             queryset = queryset.filter(bank_name__icontains=bank_name)
-        
-        # Return all cards without pagination for now
+
+        # Support pagination with ?page= or return all with ?all=true
+        if request.query_params.get('all', 'true').lower() == 'true':
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                'items': serializer.data,
+                'total': queryset.count()
+            })
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
         serializer = self.get_serializer(queryset, many=True)
         return Response({
             'items': serializer.data,
@@ -168,6 +210,14 @@ class CardViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, pk=None):
         instance = self.get_object()
         reveal = request.query_params.get('reveal', 'false').lower() == 'true'
+        if reveal:
+            import logging
+            logger = logging.getLogger('api.audit')
+            logger.info(
+                'Card data revealed: user=%s card_id=%s card_last_four=%s ip=%s',
+                request.user.email, instance.id, instance.card_last_four,
+                request.META.get('REMOTE_ADDR', 'unknown')
+            )
         serializer = self.get_serializer(instance, context={'reveal': reveal})
         return Response(serializer.data)
     
@@ -222,7 +272,6 @@ class CardViewSet(viewsets.ModelViewSet):
                     matched_card = Card.objects.filter(
                         user=request.user,
                         card_last_four=parsed.card_last_four,
-                        is_deleted=False
                     ).first()
                     if matched_card:
                         result['matched_card_id'] = str(matched_card.id)
@@ -234,7 +283,7 @@ class CardViewSet(viewsets.ModelViewSet):
             target_card = matched_card if matched_card else None
             if card_id and not target_card:
                 try:
-                    target_card = Card.objects.get(id=card_id, user=request.user, is_deleted=False)
+                    target_card = Card.objects.get(id=card_id, user=request.user)
                 except Card.DoesNotExist:
                     pass
                 except Exception:
@@ -260,7 +309,6 @@ class CardViewSet(viewsets.ModelViewSet):
                             transaction_type=parsed.transaction_type,
                             transaction_date__gte=time_window_start,
                             transaction_date__lte=time_window_end,
-                            is_deleted=False
                         ).first()
                         
                         if duplicate:
@@ -321,7 +369,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         queryset = Transaction.objects.filter(
-            user=self.request.user, is_deleted=False
+            user=self.request.user
         ).select_related('card')
 
         card_id = self.request.query_params.get('card_id')
@@ -373,7 +421,6 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 transaction_type=transaction_type,
                 transaction_date__gte=time_window_start,
                 transaction_date__lte=time_window_end,
-                is_deleted=False
             ).first()
             
             if duplicate:
@@ -405,7 +452,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
     def destroy(self, request, pk=None):
         # Get transaction including deleted ones to avoid 404 if already deleted
         try:
-            instance = Transaction.objects.get(id=pk, user=request.user)
+            instance = Transaction.all_objects.get(id=pk, user=request.user)
         except Transaction.DoesNotExist:
             return Response(
                 {'detail': 'Transaction not found'},
@@ -441,7 +488,6 @@ class TransactionViewSet(viewsets.ModelViewSet):
             user=request.user,
             transaction_date__gte=start_date,
             transaction_date__lt=end_date,
-            is_deleted=False
         )
         
         expenses = transactions.filter(transaction_type__in=['purchase', 'withdrawal', 'payment'])
@@ -469,7 +515,7 @@ class CashEntryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        return CashEntry.objects.filter(user=self.request.user, is_deleted=False).order_by('-entry_date')
+        return CashEntry.objects.filter(user=self.request.user).order_by('-entry_date')
     
     def destroy(self, request, pk=None):
         instance = self.get_object()
@@ -479,7 +525,7 @@ class CashEntryViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def balance(self, request):
-        entries = CashEntry.objects.filter(user=request.user, is_deleted=False)
+        entries = CashEntry.objects.filter(user=request.user)
         income = entries.filter(entry_type='income').aggregate(Sum('amount'))['amount__sum'] or 0
         expense = entries.filter(entry_type='expense').aggregate(Sum('amount'))['amount__sum'] or 0
         balance = float(income - expense)
@@ -488,6 +534,88 @@ class CashEntryViewSet(viewsets.ModelViewSet):
             'balance': balance,
             'currency': 'AED'
         })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_data(request):
+    """Export user data as CSV or JSON"""
+    export_format = request.query_params.get('format', 'json')
+    data_type = request.query_params.get('type', 'all')  # all, cards, transactions, cash
+
+    result = {}
+
+    if data_type in ('all', 'cards'):
+        cards = Card.objects.filter(user=request.user)
+        cards_data = []
+        for card in cards:
+            cards_data.append({
+                'card_name': card.card_name,
+                'bank_name': card.bank_name,
+                'card_type': card.card_type,
+                'card_network': card.card_network or '',
+                'card_last_four': card.card_last_four,
+                'balance_currency': card.balance_currency,
+                'available_balance': str(card.available_balance) if card.available_balance else '',
+                'credit_limit': str(card.credit_limit) if card.credit_limit else '',
+                'current_balance': str(card.current_balance) if card.current_balance else '',
+                'created_at': card.created_at.isoformat(),
+            })
+        result['cards'] = cards_data
+
+    if data_type in ('all', 'transactions'):
+        transactions = Transaction.objects.filter(user=request.user).select_related('card')
+        txn_data = []
+        for txn in transactions:
+            txn_data.append({
+                'date': txn.transaction_date.isoformat() if txn.transaction_date else '',
+                'type': txn.transaction_type,
+                'amount': str(txn.amount),
+                'currency': txn.currency,
+                'merchant': txn.merchant_name or '',
+                'description': txn.description or '',
+                'category': txn.category or '',
+                'card': txn.card.card_name if txn.card else '',
+                'source': txn.source,
+            })
+        result['transactions'] = txn_data
+
+    if data_type in ('all', 'cash'):
+        entries = CashEntry.objects.filter(user=request.user)
+        cash_data = []
+        for entry in entries:
+            cash_data.append({
+                'date': entry.entry_date.isoformat() if entry.entry_date else '',
+                'type': entry.entry_type,
+                'amount': str(entry.amount),
+                'currency': entry.currency,
+                'description': entry.description or '',
+                'category': entry.category or '',
+            })
+        result['cash_entries'] = cash_data
+
+    if export_format == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="cardvault_export_{data_type}.csv"'
+
+        writer = csv.writer(response)
+
+        for section_name, section_data in result.items():
+            if section_data:
+                writer.writerow([f'--- {section_name.upper()} ---'])
+                writer.writerow(section_data[0].keys())
+                for row in section_data:
+                    writer.writerow(row.values())
+                writer.writerow([])
+
+        return response
+    else:
+        response = HttpResponse(
+            json.dumps(result, indent=2, ensure_ascii=False),
+            content_type='application/json'
+        )
+        response['Content-Disposition'] = f'attachment; filename="cardvault_export_{data_type}.json"'
+        return response
 
 
 class ChatSessionViewSet(viewsets.ModelViewSet):

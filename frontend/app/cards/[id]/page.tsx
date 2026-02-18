@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI, Card } from '@/app/api/cards';
@@ -25,6 +25,7 @@ import {
   Check
 } from 'lucide-react';
 import { extractCardId, getCardUrl } from '@/lib/utils';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function CardDetailPage() {
   const router = useRouter();
@@ -37,6 +38,7 @@ export default function CardDetailPage() {
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [reveal, setReveal] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -44,10 +46,9 @@ export default function CardDetailPage() {
     }
   }, [isAuthenticated, loadUser, router]);
 
-  const loadCardData = async () => {
+  const loadCardData = useCallback(async () => {
     if (isAuthenticated && params.id) {
       try {
-        // Extract card ID from URL (handles both old format and new slug format)
         const cardId = extractCardId(params.id as string);
         const cardData = await cardsAPI.get(cardId, reveal);
         setCard(cardData);
@@ -58,12 +59,11 @@ export default function CardDetailPage() {
         setLoading(false);
       }
     }
-  };
+  }, [isAuthenticated, params.id, reveal, t]);
 
-  const loadTransactions = async () => {
+  const loadTransactions = useCallback(async () => {
     if (isAuthenticated && card?.id) {
       try {
-        // Use the card ID from the loaded card data, not the URL param
         const response = await transactionsAPI.list({ card_id: card.id });
         setTransactions(response.items || []);
         setTransactionsLoading(false);
@@ -72,19 +72,19 @@ export default function CardDetailPage() {
         setTransactionsLoading(false);
       }
     }
-  };
+  }, [isAuthenticated, card?.id]);
 
   useEffect(() => {
     if (isAuthenticated && params.id) {
       loadCardData();
     }
-  }, [isAuthenticated, params.id, reveal]);
+  }, [isAuthenticated, params.id, reveal, loadCardData]);
 
   useEffect(() => {
     if (card?.id) {
       loadTransactions();
     }
-  }, [card?.id]);
+  }, [card?.id, loadTransactions]);
 
   const refreshData = async () => {
     setLoading(true);
@@ -93,15 +93,18 @@ export default function CardDetailPage() {
     toast.success(t('common.refreshed'));
   };
 
-  const handleDelete = async () => {
-    if (confirm(t('cards.deleteConfirm'))) {
-      try {
-        await cardsAPI.delete(card!.id);
-        toast.success(t('success.cardDeleted'));
-        router.push('/cards');
-      } catch (error) {
-        toast.error(t('errors.generic'));
-      }
+  const handleDelete = () => {
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    setDeleteConfirmOpen(false);
+    try {
+      await cardsAPI.delete(card!.id);
+      toast.success(t('success.cardDeleted'));
+      router.push('/cards');
+    } catch (error) {
+      toast.error(t('errors.generic'));
     }
   };
 
@@ -468,6 +471,17 @@ export default function CardDetailPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        title={t('cards.deleteCard') || 'Delete Card'}
+        message={t('cards.deleteConfirm') || 'Are you sure you want to delete this card? This action cannot be undone.'}
+        confirmLabel={t('common.delete') || 'Delete'}
+        cancelLabel={t('common.cancel') || 'Cancel'}
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
     </Layout>
   );
 }

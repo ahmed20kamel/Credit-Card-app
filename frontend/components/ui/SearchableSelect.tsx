@@ -169,7 +169,7 @@ export function SearchableSelect({
           className="searchable-select-list"
         >
           {filteredOptions.length === 0 ? (
-            <li className="searchable-select-item searchable-select-empty" role="option">
+            <li className="searchable-select-item searchable-select-empty" role="option" aria-selected={false}>
               {noMatchesText}
             </li>
           ) : (
@@ -177,7 +177,7 @@ export function SearchableSelect({
               <li
                 key={option}
                 role="option"
-                aria-selected={value === option}
+                aria-selected={hasValueMap && allValues ? value === allValues[allOptions.indexOf(option)] : value === option}
                 data-highlighted={i === highlightIndex ? 'true' : undefined}
                 className={`searchable-select-item ${i === highlightIndex ? 'highlighted' : ''}`}
                 onMouseEnter={() => setHighlightIndex(i)}

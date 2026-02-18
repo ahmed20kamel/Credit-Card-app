@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/app/store/authStore';
@@ -50,16 +50,16 @@ export default function TransactionsPage() {
     }
   }, [isAuthenticated, loadUser, router]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
       try {
         const [cardsRes, transactionsRes] = await Promise.all([
           cardsAPI.list().then((res) => res.items || []),
-          transactionsAPI.list({ 
+          transactionsAPI.list({
             card_id: selectedCard !== 'all' ? selectedCard : undefined,
             transaction_type: transactionType !== 'all' ? transactionType : undefined
           }).then((res) => res.items || [])
@@ -74,13 +74,13 @@ export default function TransactionsPage() {
     } finally {
         setLoading(false);
     }
-  };
+  }, [isAuthenticated, selectedCard, transactionType, t]);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadData();
     }
-  }, [isAuthenticated, selectedCard, transactionType]);
+  }, [isAuthenticated, selectedCard, transactionType, loadData]);
 
   const handleDelete = async (id: string) => {
     if (confirm(t('transactions.deleteConfirm'))) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI } from '@/app/api/cards';
@@ -237,7 +237,7 @@ export default function SeedCardsPage() {
     checkAuth();
   }, [loadUser]);
 
-  const handleSeedCards = async () => {
+  const handleSeedCards = useCallback(async () => {
     if (!isAuthenticated) {
       toast.error('يجب تسجيل الدخول أولاً');
       router.push('/login');
@@ -278,14 +278,14 @@ export default function SeedCardsPage() {
     if (errorCount > 0) {
       toast.error(`فشل إضافة ${errorCount} بطاقة`);
     }
-  };
+  }, [router, isAuthenticated]);
 
   // إضافة تلقائية عند فتح الصفحة بعد التأكد من المصادقة
   useEffect(() => {
     if (!checkingAuth && isAuthenticated && !started && !loading) {
       handleSeedCards();
     }
-  }, [checkingAuth, isAuthenticated, started, loading]);
+  }, [checkingAuth, isAuthenticated, started, loading, handleSeedCards]);
 
   // عرض حالة التحميل
   if (checkingAuth || isLoading) {

@@ -40,6 +40,17 @@ class User(AbstractBaseUser):
         return self.email
 
 
+class ActiveManager(models.Manager):
+    """Manager that automatically filters out soft-deleted records."""
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+
+class AllObjectsManager(models.Manager):
+    """Manager that returns all records including soft-deleted ones."""
+    pass
+
+
 class Card(models.Model):
     CARD_TYPES = [('credit', 'Credit'), ('debit', 'Debit'), ('prepaid', 'Prepaid')]
     
@@ -69,10 +80,13 @@ class Card(models.Model):
     minimum_payment_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text='Min payment as % of amount due (e.g. 5 for 5%), varies by bank')
     credit_limit = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, help_text='Total credit limit')
     current_balance = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, help_text='Current outstanding balance')
-    
+
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = ActiveManager()
+    all_objects = AllObjectsManager()
 
     class Meta:
         db_table = 'cards'
@@ -103,6 +117,9 @@ class Transaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = ActiveManager()
+    all_objects = AllObjectsManager()
+
     class Meta:
         db_table = 'transactions'
         indexes = [
@@ -126,6 +143,9 @@ class CashEntry(models.Model):
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = ActiveManager()
+    all_objects = AllObjectsManager()
 
     class Meta:
         db_table = 'cash_entries'

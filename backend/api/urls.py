@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    register, login, refresh_token, profile, change_password,
+    register, login, refresh_token, profile, change_password, export_data,
     CardViewSet, TransactionViewSet, CashEntryViewSet,
     ChatSessionViewSet, ChatMessageViewSet
 )
@@ -25,5 +25,6 @@ urlpatterns = [
     path('auth/refresh/', refresh_token, name='refresh'),
     path('auth/me/', profile, name='profile'),
     path('auth/change-password/', change_password, name='change-password'),
+    path('export/', export_data, name='export-data'),
     path('', include(router.urls)),
 ]

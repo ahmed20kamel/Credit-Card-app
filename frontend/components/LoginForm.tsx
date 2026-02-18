@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/app/store/authStore';
 import { useTranslations } from '@/lib/i18n';
 import { getErrorMessage } from '@/lib/errors';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginForm() {
   const router = useRouter();
@@ -15,6 +15,7 @@ export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,17 +66,28 @@ export default function LoginForm() {
             <label htmlFor="password" className="form-label">
               {t('auth.password') || 'Password'}
             </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t('auth.passwordPlaceholder') || 'Enter your password'}
-              className="form-input"
-            />
+            <div className="password-input-wrapper">
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t('auth.passwordPlaceholder') || 'Enter your password'}
+                className="form-input"
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <button type="submit" disabled={isLoading} className="btn btn-primary btn-full">

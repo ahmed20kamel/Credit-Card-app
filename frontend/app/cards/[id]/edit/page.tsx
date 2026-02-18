@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI, Card } from '@/app/api/cards';
@@ -49,15 +49,7 @@ export default function EditCardPage() {
     }
   }, [isAuthenticated, loadUser, router]);
 
-  useEffect(() => {
-    if (isAuthenticated && params.id) {
-      const id = extractCardId(params.id as string);
-      setCardId(id);
-      loadCard(id);
-    }
-  }, [isAuthenticated, params.id]);
-
-  const loadCard = async (id: string) => {
+  const loadCard = useCallback(async (id: string) => {
     try {
       const card = await cardsAPI.get(id, true);
       setFormData({
@@ -87,7 +79,15 @@ export default function EditCardPage() {
       toast.error(message);
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    if (isAuthenticated && params.id) {
+      const id = extractCardId(params.id as string);
+      setCardId(id);
+      loadCard(id);
+    }
+  }, [isAuthenticated, params.id, loadCard]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>

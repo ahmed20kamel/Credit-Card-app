@@ -102,7 +102,7 @@ class CardSerializer(serializers.ModelSerializer):
         except Exception as e:
             logger.exception('Card create failed: %s', e)
             raise serializers.ValidationError(
-                {'detail': f'Could not save card. Please check your data. ({str(e)})'}
+                {'detail': 'Could not save card. Please check your data and try again.'}
             )
     
     def to_representation(self, instance):
@@ -271,7 +271,7 @@ class TransactionSerializer(serializers.ModelSerializer):
         if card_id:
             try:
                 from .models import Card
-                card = Card.objects.get(id=card_id, user=user, is_deleted=False)
+                card = Card.objects.get(id=card_id, user=user)
             except Card.DoesNotExist:
                 pass  # card will remain None
         

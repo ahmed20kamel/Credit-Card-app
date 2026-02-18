@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI, Card } from '@/app/api/cards';
@@ -15,6 +15,7 @@ import BulkActions from '@/components/BulkActions';
 import LoadingState from '@/components/ui/LoadingState';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function CardsPage() {
   const router = useRouter();
@@ -28,6 +29,8 @@ export default function CardsPage() {
   const [deleting, setDeleting] = useState(false);
   const [revealedCards, setRevealedCards] = useState<Set<string>>(new Set());
   const [copiedCardId, setCopiedCardId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, cardId: string | null}>({isOpen: false, cardId: null});
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -35,12 +38,12 @@ export default function CardsPage() {
     }
   }, [isAuthenticated, loadUser, router]);
 
-  const loadCards = async () => {
+  const loadCards = useCallback(async () => {
     if (!isAuthenticated) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const res = await cardsAPI.list({ bank_name: bankFilter || undefined });
         setCards(res.items || []);
@@ -51,13 +54,13 @@ export default function CardsPage() {
     } finally {
         setLoading(false);
     }
-  };
+  }, [isAuthenticated, bankFilter, t]);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadCards();
     }
-  }, [isAuthenticated, bankFilter]);
+  }, [isAuthenticated, bankFilter, loadCards]);
 
   const toggleReveal = async (cardId: string) => {
     if (revealedCards.has(cardId)) {
@@ -128,20 +131,25 @@ export default function CardsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm(t('cards.deleteConfirm'))) {
-      try {
-        await cardsAPI.delete(id);
-        setCards(cards.filter((c) => c.id !== id));
-        setSelectedCards(prev => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        toast.success(t('success.cardDeleted'));
-      } catch (err) {
-        toast.error(t('errors.generic'));
-      }
+  const handleDelete = (id: string) => {
+    setDeleteConfirm({ isOpen: true, cardId: id });
+  };
+
+  const confirmDelete = async () => {
+    const id = deleteConfirm.cardId;
+    if (!id) return;
+    setDeleteConfirm({ isOpen: false, cardId: null });
+    try {
+      await cardsAPI.delete(id);
+      setCards(cards.filter((c) => c.id !== id));
+      setSelectedCards(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      toast.success(t('success.cardDeleted'));
+    } catch (err) {
+      toast.error(t('errors.generic'));
     }
   };
 
@@ -165,22 +173,21 @@ export default function CardsPage() {
     setSelectedCards(new Set());
   };
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedCards.size === 0) return;
-    
-    const confirmMessage = t('cards.deleteMultipleConfirm', { count: selectedCards.size }) || 
-      `Are you sure you want to delete ${selectedCards.size} card(s)?`;
-    
-    if (!confirm(confirmMessage)) return;
+    setBulkDeleteConfirm(true);
+  };
 
+  const confirmBulkDelete = async () => {
+    setBulkDeleteConfirm(false);
     setDeleting(true);
     try {
       const deletePromises = Array.from(selectedCards).map(id => cardsAPI.delete(id));
       await Promise.all(deletePromises);
-      
+
       setCards(cards.filter(c => !selectedCards.has(c.id)));
       setSelectedCards(new Set());
-      toast.success(t('success.cardsDeleted', { count: selectedCards.size }) || 
+      toast.success(t('success.cardsDeleted', { count: selectedCards.size }) ||
         `${selectedCards.size} card(s) deleted successfully`);
     } catch (err) {
       toast.error(t('errors.generic'));
@@ -456,6 +463,28 @@ export default function CardsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title={t('cards.deleteCard') || 'Delete Card'}
+        message={t('cards.deleteConfirm') || 'Are you sure you want to delete this card? This action cannot be undone.'}
+        confirmLabel={t('common.delete') || 'Delete'}
+        cancelLabel={t('common.cancel') || 'Cancel'}
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, cardId: null })}
+      />
+
+      <ConfirmDialog
+        isOpen={bulkDeleteConfirm}
+        title={t('cards.deleteCards') || 'Delete Cards'}
+        message={t('cards.deleteMultipleConfirm', { count: selectedCards.size }) || `Are you sure you want to delete ${selectedCards.size} card(s)? This action cannot be undone.`}
+        confirmLabel={t('common.delete') || 'Delete'}
+        cancelLabel={t('common.cancel') || 'Cancel'}
+        variant="danger"
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkDeleteConfirm(false)}
+      />
     </Layout>
   );
 }

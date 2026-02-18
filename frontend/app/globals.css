@@ -892,13 +892,18 @@ p {
 /* تحسين شكل الكروت في صفحة Cards - 3 كروت في الصف */
 .cards-page .credit-card-container {
   max-width: 100%;
-  height: 280px;
+  height: auto;
+  min-height: 280px;
   margin: 0 auto;
 }
 
+.cards-page .credit-card {
+  overflow: visible;
+}
+
 .cards-page .credit-card-detail {
-  min-height: 320px;
-  height: 320px;
+  min-height: 280px;
+  height: auto;
   padding: var(--space-6);
   display: flex;
   flex-direction: column;
@@ -945,12 +950,12 @@ p {
 }
 
 .cards-page .credit-card-cvv-section {
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .cards-page .credit-card-cvv-section .credit-card-label {
@@ -1036,12 +1041,13 @@ p {
   }
   
   .cards-page .credit-card-container {
-    height: 260px;
+    height: auto;
+    min-height: 260px;
   }
-  
+
   .cards-page .credit-card-detail {
-    min-height: 280px;
-    height: 280px;
+    min-height: 260px;
+    height: auto;
     padding: var(--space-5);
   }
 }
@@ -5450,4 +5456,312 @@ html[dir="rtl"] .credit-card-form-ltr * {
   max-width: 400px;
   margin-left: auto;
   margin-right: auto;
+}
+
+/* ============================================
+   PASSWORD VISIBILITY TOGGLE
+   ============================================ */
+
+.password-input-wrapper {
+  position: relative;
+}
+
+.password-input-wrapper .form-input {
+  padding-right: 2.75rem;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-light);
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.password-toggle-btn:hover {
+  color: var(--primary);
+}
+
+[dir="rtl"] .password-input-wrapper .form-input {
+  padding-right: var(--space-3);
+  padding-left: 2.75rem;
+}
+
+[dir="rtl"] .password-toggle-btn {
+  right: auto;
+  left: 0.75rem;
+}
+
+/* ============================================
+   CONFIRM DIALOG
+   ============================================ */
+
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.15s ease;
+}
+
+.confirm-dialog {
+  background: var(--bg);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: var(--shadow-xl);
+  animation: slideUp 0.2s ease;
+}
+
+.confirm-dialog-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-4);
+}
+
+.confirm-dialog-icon-danger {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--danger);
+}
+
+.confirm-dialog-icon-warning {
+  background: rgba(217, 119, 6, 0.1);
+  color: var(--warning);
+}
+
+.confirm-dialog-icon-info {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+.confirm-dialog-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--space-2);
+}
+
+.confirm-dialog-message {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-6);
+  line-height: 1.5;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+.confirm-dialog-actions .btn {
+  min-width: 100px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ============================================
+   SKELETON LOADERS
+   ============================================ */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-line {
+  background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-100) 50%, var(--gray-200) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite ease-in-out;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-w-20 { width: 20%; }
+.skeleton-w-30 { width: 30%; }
+.skeleton-w-40 { width: 40%; }
+.skeleton-w-60 { width: 60%; }
+.skeleton-w-80 { width: 80%; }
+.skeleton-w-full { width: 100%; }
+
+.skeleton-h-xs { height: 12px; }
+.skeleton-h-sm { height: 16px; }
+.skeleton-h-md { height: 24px; }
+.skeleton-h-lg { height: 32px; }
+
+.skeleton-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.skeleton-credit-card {
+  background: var(--gray-100);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.skeleton-details {
+  padding: var(--space-5);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.skeleton-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.skeleton-summary-card {
+  padding: var(--space-5);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.skeleton-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+}
+
+.skeleton-chart {
+  background: var(--gray-100);
+  border-radius: var(--radius-lg);
+  height: 300px;
+  animation: shimmer 1.5s infinite ease-in-out;
+  background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-100) 50%, var(--gray-200) 75%);
+  background-size: 200% 100%;
+}
+
+.skeleton-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.skeleton-table-header {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--border);
+}
+
+.skeleton-table-row {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-light);
+}
+
+[data-theme="dark"] .skeleton-line {
+  background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-300) 50%, var(--gray-200) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite ease-in-out;
+}
+
+[data-theme="dark"] .skeleton-credit-card {
+  background: var(--gray-200);
+}
+
+@media (max-width: 768px) {
+  .skeleton-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .skeleton-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
+   FORM ERROR STATES
+   ============================================ */
+
+.form-group.has-error .form-input,
+.form-input.input-error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.form-error {
+  font-size: 0.75rem;
+  color: var(--danger);
+  margin-top: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.form-group.has-success .form-input {
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+/* ============================================
+   RESPONSIVE TABLES
+   ============================================ */
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.table-responsive table {
+  min-width: 600px;
+}
+
+@media (max-width: 768px) {
+  .table-responsive {
+    margin: 0 calc(var(--space-4) * -1);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
@@ -40,7 +40,7 @@ export default function CashPage() {
     }
   }, [isAuthenticated, loadUser, router]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
 
     setLoading(true);
@@ -59,13 +59,13 @@ export default function CashPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, t]);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loadData]);
 
   const resetForm = () => {
     setEntryType('income');
