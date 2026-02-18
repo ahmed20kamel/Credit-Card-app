@@ -186,7 +186,8 @@
     "scanTiltHint": "Tilt the card slightly to create shadows on embossed numbers",
     "scanningAuto": "Scanning...",
     "scanRetrying": "Adjusting... Hold card steady",
-    "switchCamera": "Flip"
+    "switchCamera": "Flip",
+    "uploadImageHint": "Select a photo of your card from gallery"
   },
   "transactions": {
     "title": "Transactions",

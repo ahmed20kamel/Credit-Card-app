@@ -186,7 +186,8 @@
     "scanTiltHint": "ميّل البطاقة قليلاً لإظهار ظلال الأرقام المنقوشة",
     "scanningAuto": "جاري المسح...",
     "scanRetrying": "جاري التعديل... ثبّت البطاقة",
-    "switchCamera": "تبديل"
+    "switchCamera": "تبديل",
+    "uploadImageHint": "اختر صورة لبطاقتك من المعرض"
   },
   "transactions": {
     "title": "المعاملات",

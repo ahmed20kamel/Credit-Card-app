@@ -3742,6 +3742,20 @@ html[dir="rtl"] .credit-card-form-ltr * {
   flex-shrink: 0;
 }
 
+/* Scan buttons row */
+.scan-buttons-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+@media (max-width: 600px) {
+  .scan-buttons-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Native scanner button (primary method) */
 .scan-method-primary {
   margin-bottom: var(--space-3);
@@ -3866,8 +3880,19 @@ html[dir="rtl"] .credit-card-form-ltr * {
   border-color: var(--primary);
 }
 
-.scan-btn-upload:hover {
+.scan-btn-native.scan-btn-upload {
+  border-color: var(--border);
+  background: var(--bg-secondary);
+}
+
+.scan-btn-native.scan-btn-upload:hover {
   border-color: var(--primary);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(59, 130, 246, 0.12) 100%);
+}
+
+.scan-btn-native.scan-btn-upload:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .scan-loading {

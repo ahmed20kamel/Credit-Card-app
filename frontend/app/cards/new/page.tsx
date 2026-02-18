@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Shield, X, CheckCircle, ScanLine } from 'lucide-react';
+import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Upload, Loader2, Shield, X, CheckCircle, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CreditCard, type CreditCardValue } from '@/components/ui/CreditCard';
 import { CameraCardScanner, type ScanResult } from '@/components/ui/CameraCardScanner';
@@ -24,6 +24,8 @@ function NewCardContent() {
   const [cardValid, setCardValid] = useState(false);
   const [scanPreview, setScanPreview] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [creditCard, setCreditCard] = useState<CreditCardValue>({
     cardholderName: '',
@@ -95,6 +97,51 @@ function NewCardContent() {
       (t('cards.scanSuccess') || 'Card scanned!') + ` ${fieldsFound.length} ` + (t('cards.fieldsExtracted') || 'fields')
     );
   }, [t]);
+
+  // Handle image file upload
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so same file can be selected again
+    e.target.value = '';
+
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('cards.scanInvalidFile') || 'Please select an image file');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error(t('cards.scanFileTooLarge') || 'Image must be under 10MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const result = await cardsAPI.scanCardImage(dataUrl);
+
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        const fields = Object.keys(result).filter(k => result[k as keyof typeof result]);
+        if (fields.length > 0) {
+          handleScanResult(result);
+        } else {
+          toast.error(t('cards.scanNoData') || 'Could not read card details.');
+        }
+      }
+    } catch {
+      toast.error(t('cards.scanFailed') || 'Failed to scan card. Please try a clearer photo.');
+    } finally {
+      setUploading(false);
+    }
+  }, [t, handleScanResult]);
 
   if (!isAuthenticated) {
     return null;
@@ -200,20 +247,46 @@ function NewCardContent() {
             </div>
           </div>
 
-          {/* Camera Scanner Button */}
-          <button
-            type="button"
-            className="scan-btn scan-btn-native"
-            onClick={() => setCameraOpen(true)}
-          >
-            <div className="scan-btn-icon-wrap">
-              <Camera size={28} />
-            </div>
-            <div className="scan-btn-text">
-              <span className="scan-btn-label">{t('cards.scanWithCamera') || 'Scan with Camera'}</span>
-              <span className="scan-btn-hint">{t('cards.scanWithCameraHint') || 'Auto-scan your card details using the camera'}</span>
-            </div>
-          </button>
+          {/* Scan Buttons */}
+          <div className="scan-buttons-row">
+            <button
+              type="button"
+              className="scan-btn scan-btn-native"
+              onClick={() => setCameraOpen(true)}
+            >
+              <div className="scan-btn-icon-wrap">
+                <Camera size={28} />
+              </div>
+              <div className="scan-btn-text">
+                <span className="scan-btn-label">{t('cards.scanWithCamera') || 'Scan with Camera'}</span>
+                <span className="scan-btn-hint">{t('cards.scanWithCameraHint') || 'Auto-scan your card details using the camera'}</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className="scan-btn scan-btn-native scan-btn-upload"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              <div className="scan-btn-icon-wrap">
+                {uploading ? <Loader2 size={28} className="scan-spinner" /> : <Upload size={28} />}
+              </div>
+              <div className="scan-btn-text">
+                <span className="scan-btn-label">{t('cards.uploadImage') || 'Upload Image'}</span>
+                <span className="scan-btn-hint">{t('cards.uploadImageHint') || 'Select a photo of your card from gallery'}</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+          />
 
           {scanPreview && (
             <div className="scan-preview">
