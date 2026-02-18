@@ -181,8 +181,11 @@ CORS_ALLOWED_ORIGINS = [
 
 # Allow additional origins from environment variable (comma-separated)
 cors_origins_env = config('CORS_ORIGINS', default='')
-if cors_origins_env:
-    CORS_ALLOWED_ORIGINS.extend([origin.strip() for origin in cors_origins_env.split(',') if origin.strip()])
+if cors_origins_env and cors_origins_env.strip() != '*':
+    CORS_ALLOWED_ORIGINS.extend([
+        origin.strip() for origin in cors_origins_env.split(',')
+        if origin.strip() and origin.strip().startswith('http')
+    ])
 
 # Allow .onrender.com origins in production
 if RENDER:
@@ -192,8 +195,8 @@ if RENDER:
 
 CORS_ALLOW_CREDENTIALS = True
 
-# In development, allow all origins
-if DEBUG:
+# In development, allow all origins; also if CORS_ORIGINS='*'
+if DEBUG or cors_origins_env.strip() == '*':
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = False
