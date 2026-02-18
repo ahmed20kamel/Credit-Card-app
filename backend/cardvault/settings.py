@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from decouple import config
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -12,8 +13,14 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-producti
 DEBUG = config('DEBUG', default='False', cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0').split(',')
+
+# Render sets RENDER=true in environment
+RENDER = config('RENDER', default='False', cast=bool)
+if RENDER:
+    ALLOWED_HOSTS.append('.onrender.com')
+
 if DEBUG:
-    ALLOWED_HOSTS = ['*']  # allow network access when dev server binds to 0.0.0.0
+    ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -30,6 +37,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',  # Required for admin
     'corsheaders.middleware.CorsMiddleware',  # Must be before CommonMiddleware
     'django.middleware.common.CommonMiddleware',
@@ -61,36 +69,45 @@ WSGI_APPLICATION = 'cardvault.wsgi.application'
 
 # Database configuration
 # Priority:
-# 1. If POSTGRES_HOST='db' → Docker → Use PostgreSQL
-# 2. If USE_SQLITE=True → Use SQLite (default for local dev)
-# 3. If USE_SQLITE=False → Use PostgreSQL (local or remote)
+# 1. DATABASE_URL env var (Render / production)
+# 2. If POSTGRES_HOST='db' → Docker → Use PostgreSQL
+# 3. If USE_SQLITE=True → Use SQLite (default for local dev)
+# 4. If USE_SQLITE=False → Use PostgreSQL (local or remote)
 
-USE_SQLITE = config('USE_SQLITE', default='True', cast=bool)
-POSTGRES_HOST = config('POSTGRES_HOST', default='localhost')
+DATABASE_URL = config('DATABASE_URL', default='')
 
-# Docker detection: if host is 'db', it's Docker
-IS_DOCKER = POSTGRES_HOST == 'db'
-
-if IS_DOCKER or not USE_SQLITE:
-    # PostgreSQL (Docker or explicit PostgreSQL)
+if DATABASE_URL:
+    # Production (Render, Heroku, etc.)
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('POSTGRES_DB', default='cardvault'),
-            'USER': config('POSTGRES_USER', default='cardvault'),
-            'PASSWORD': config('POSTGRES_PASSWORD', default='cardvault_dev_pass'),
-            'HOST': POSTGRES_HOST,
-            'PORT': config('POSTGRES_PORT', default='5432'),
-        }
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
 else:
-    # SQLite (default for local development)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+    USE_SQLITE = config('USE_SQLITE', default='True', cast=bool)
+    POSTGRES_HOST = config('POSTGRES_HOST', default='localhost')
+    IS_DOCKER = POSTGRES_HOST == 'db'
+
+    if IS_DOCKER or not USE_SQLITE:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': config('POSTGRES_DB', default='cardvault'),
+                'USER': config('POSTGRES_USER', default='cardvault'),
+                'PASSWORD': config('POSTGRES_PASSWORD', default='cardvault_dev_pass'),
+                'HOST': POSTGRES_HOST,
+                'PORT': config('POSTGRES_PORT', default='5432'),
+            }
         }
-    }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 
 AUTH_USER_MODEL = 'api.User'
 
@@ -118,6 +135,12 @@ USE_TZ = True
 APPEND_SLASH = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
@@ -152,19 +175,20 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3001',
-    'http://localhost:3003',
-    'http://127.0.0.1:3003',
     'http://localhost:8080',
     'http://127.0.0.1:8080',
-    'http://192.168.1.53:8080',
 ]
 
-# Allow additional origins from environment variable
+# Allow additional origins from environment variable (comma-separated)
 cors_origins_env = config('CORS_ORIGINS', default='')
 if cors_origins_env:
     CORS_ALLOWED_ORIGINS.extend([origin.strip() for origin in cors_origins_env.split(',') if origin.strip()])
+
+# Allow .onrender.com origins in production
+if RENDER:
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r'^https://.*\.onrender\.com$',
+    ]
 
 CORS_ALLOW_CREDENTIALS = True
 

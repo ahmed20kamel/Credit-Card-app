@@ -1,0 +1,52 @@
+databases:
+  - name: cardvault-db
+    plan: free
+    databaseName: cardvault
+    user: cardvault
+
+services:
+  # ── Django Backend ──
+  - type: web
+    name: cardvault-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn cardvault.wsgi:application --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cardvault-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: RENDER
+        value: "True"
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: CORS_ORIGINS
+        sync: false  # After deploy, set to: https://cardvault-frontend.onrender.com
+      - key: ANTHROPIC_API_KEY
+        sync: false  # Optional: set if using AI features
+
+  # ── Next.js Frontend (SSR — has API proxy routes) ──
+  - type: web
+    name: cardvault-frontend
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: "npm install && npm run build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public 2>/dev/null || true"
+    startCommand: "cd .next/standalone && HOSTNAME=0.0.0.0 node server.js"
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: "/api/v1"
+      - key: BACKEND_URL
+        sync: false  # After deploy, set to: https://cardvault-backend.onrender.com
+      - key: NODE_VERSION
+        value: "20"
+      - key: PORT
+        value: "8080"
