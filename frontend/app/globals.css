@@ -2921,6 +2921,118 @@ html[dir="rtl"] .credit-card-form-ltr * {
 }
 
 /* ============================================
+   TRANSACTIONS PAGE
+   ============================================ */
+
+.txn-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+  gap: var(--space-4);
+}
+
+.txn-page-header h1 {
+  margin-bottom: 0.25rem;
+}
+
+.txn-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  margin: 0;
+}
+
+.txn-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.txn-filter-group {
+  display: flex;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.txn-filter {
+  flex: 1;
+  min-width: 0;
+}
+
+.txn-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+
+.txn-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-bg);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.txn-refresh-btn:hover {
+  background: rgba(107, 44, 145, 0.12);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(107, 44, 145, 0.15);
+}
+
+.txn-refresh-btn:active {
+  transform: translateY(0);
+}
+
+.txn-refresh-btn svg {
+  transition: transform 0.3s ease;
+}
+
+.txn-refresh-btn:hover svg {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 768px) {
+  .txn-page-header {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .txn-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .txn-filter-group {
+    flex-direction: column;
+  }
+
+  .txn-refresh-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ============================================
    TRANSACTION BADGES
    ============================================ */
 
@@ -3320,6 +3432,7 @@ html[dir="rtl"] .credit-card-form-ltr * {
   color: var(--success);
 }
 
+/* Legacy summary/info (kept for other pages) */
 .summary-list {
   display: flex;
   flex-direction: column;
@@ -3388,6 +3501,139 @@ html[dir="rtl"] .credit-card-form-ltr * {
   text-transform: uppercase;
 }
 
+/* ============================================
+   CARD DETAIL SIDEBAR (Redesigned)
+   ============================================ */
+
+/* Finance card - clean rows with label left, amount right */
+.sidebar-finance-card {
+  padding: var(--space-4) !important;
+}
+
+.sidebar-finance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-finance-row:last-of-type {
+  border-bottom: none;
+}
+
+.sidebar-finance-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sidebar-finance-amount {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-finance-currency {
+  font-size: 0.8rem;
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+.sidebar-finance-danger {
+  color: var(--danger);
+}
+
+.sidebar-finance-success {
+  color: var(--success);
+}
+
+.sidebar-usage-section {
+  padding-top: 0.75rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-usage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-usage-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sidebar-usage-percent {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* Info card - 2-column grid for card details */
+.sidebar-info-card {
+  padding: var(--space-4) !important;
+}
+
+.sidebar-info-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--primary);
+}
+
+.sidebar-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.sidebar-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sidebar-info-item-full {
+  grid-column: 1 / -1;
+}
+
+.sidebar-info-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sidebar-info-value {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Actions card */
+.sidebar-actions-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: var(--space-4) !important;
+}
+
 .actions-list {
   display: flex;
   flex-direction: column;
@@ -3396,7 +3642,7 @@ html[dir="rtl"] .credit-card-form-ltr * {
 
 .btn-full {
   width: 100%;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .btn-icon-only {
@@ -4334,6 +4580,108 @@ html[dir="rtl"] .credit-card-form-ltr * {
   line-height: 1.4;
 }
 
+/* Manual Entry Form - Step-based design */
+.manual-form-section {
+  padding: var(--space-5) !important;
+  margin-bottom: var(--space-4);
+}
+
+.manual-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.manual-section-number {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+  border-radius: 50%;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.manual-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 0.15rem 0;
+}
+
+.manual-section-desc {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.manual-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.manual-form-full {
+  grid-column: 1 / -1;
+}
+
+.manual-form-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.manual-form-label svg {
+  color: var(--primary);
+  opacity: 0.7;
+}
+
+.manual-amount-input {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
+}
+
+.manual-form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.manual-submit-btn {
+  flex: 1;
+  padding: var(--space-3) var(--space-5) !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+
+@media (max-width: 640px) {
+  .manual-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-form-actions {
+    flex-direction: column;
+  }
+
+  .manual-form-actions .btn {
+    width: 100%;
+  }
+}
+
 /* Parsed Data */
 .parsed-data-card {
   background: var(--gray-50);
@@ -5145,10 +5493,6 @@ html[dir="rtl"] .credit-card-form-ltr * {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius);
-}
-
-.btn-full {
-  width: 100%;
 }
 
 /* ============================================

@@ -7,7 +7,8 @@ import { useAuthStore } from '@/app/store/authStore';
 import { transactionsAPI } from '@/app/api/transactions';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { formatAmount, formatPercent, currencySymbol } from '@/lib/formatNumber';
+import { formatAmount, formatPercent } from '@/lib/formatNumber';
+import CurrencySymbol from '@/components/ui/CurrencySymbol';
 import { getErrorMessage } from '@/lib/errors';
 import toast from 'react-hot-toast';
 import type { Transaction, MonthlySummary, MonthlyChartData, CategoryChartData } from '@/types';
@@ -167,7 +168,7 @@ export default function DashboardPage() {
               <div className="summary-content">
                 <div className="summary-label">{t('dashboard.totalSpent')}</div>
                 <div className="summary-value">
-                  {formatAmount(summary.total_spent ?? 0)} <span className="summary-currency">{currencySymbol(summary.currency || 'AED')}</span>
+                  {formatAmount(summary.total_spent ?? 0)} <span className="summary-currency"><CurrencySymbol code={summary.currency || 'AED'} size={18} /></span>
                 </div>
               </div>
               <div className="summary-icon">
@@ -179,7 +180,7 @@ export default function DashboardPage() {
               <div className="summary-content">
                 <div className="summary-label">{t('dashboard.totalIncome')}</div>
                 <div className="summary-value">
-                  {formatAmount(summary.total_income ?? 0)} <span className="summary-currency">{currencySymbol(summary.currency || 'AED')}</span>
+                  {formatAmount(summary.total_income ?? 0)} <span className="summary-currency"><CurrencySymbol code={summary.currency || 'AED'} size={18} /></span>
                 </div>
               </div>
               <div className="summary-icon">
@@ -191,7 +192,7 @@ export default function DashboardPage() {
               <div className="summary-content">
                 <div className="summary-label">{t('dashboard.net')}</div>
                 <div className="summary-value">
-                  {formatAmount(summary.net ?? 0)} <span className="summary-currency">{currencySymbol(summary.currency || 'AED')}</span>
+                  {formatAmount(summary.net ?? 0)} <span className="summary-currency"><CurrencySymbol code={summary.currency || 'AED'} size={18} /></span>
                 </div>
               </div>
               <div className="summary-icon">
@@ -270,7 +271,7 @@ export default function DashboardPage() {
                 {t('dashboard.avgTransaction') || 'Avg Transaction'}
               </p>
               <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text)' }}>
-                {formatAmount(stats.avgAmount)} <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>{currencySymbol('AED')}</span>
+                {formatAmount(stats.avgAmount)} <span style={{ fontSize: '0.85rem', opacity: 0.6 }}><CurrencySymbol code="AED" size={14} /></span>
               </p>
             </div>
             <div className="card" style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
@@ -279,7 +280,7 @@ export default function DashboardPage() {
               </p>
               <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text)' }}>
                 <ArrowUpRight size={18} style={{ verticalAlign: 'middle', color: 'var(--danger)', marginRight: '0.15rem' }} />
-                {formatAmount(stats.maxAmount)} <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>{currencySymbol('AED')}</span>
+                {formatAmount(stats.maxAmount)} <span style={{ fontSize: '0.85rem', opacity: 0.6 }}><CurrencySymbol code="AED" size={14} /></span>
               </p>
             </div>
             <div className="card" style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
@@ -340,7 +341,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className={`recent-transaction-amount ${isExpense ? 'expense' : 'income'}`}>
-                      {isExpense ? '-' : '+'}{formatAmount(txn.amount)} {currencySymbol(txn.currency)}
+                      {isExpense ? '-' : '+'}{formatAmount(txn.amount)} <CurrencySymbol code={txn.currency} size={14} />
                     </div>
                   </div>
                 );

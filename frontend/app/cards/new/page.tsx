@@ -12,6 +12,7 @@ import { CreditCard, type CreditCardValue } from '@/components/ui/CreditCard';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { UAE_BANKS } from '@/lib/uae-banks';
 import { getErrorMessage } from '@/lib/errors';
+import FormattedNumberInput from '@/components/ui/FormattedNumberInput';
 
 function NewCardContent() {
   const router = useRouter();
@@ -227,11 +228,9 @@ function NewCardContent() {
 
                   <div className="form-group">
                     <label>{t('cards.availableBalance') || 'Available Balance'}</label>
-                    <input
-                      type="number"
-                      step="0.01"
+                    <FormattedNumberInput
                       value={formData.available_balance}
-                      onChange={(e) => setFormData({ ...formData, available_balance: e.target.value })}
+                      onChange={(v) => setFormData({ ...formData, available_balance: v })}
                       placeholder="0.00"
                     />
                   </div>
@@ -249,22 +248,18 @@ function NewCardContent() {
                   <div className="grid grid-2">
                     <div className="form-group">
                       <label>{t('cards.creditLimit') || 'Credit Limit'}</label>
-                      <input
-                        type="number"
-                        step="0.01"
+                      <FormattedNumberInput
                         value={formData.credit_limit}
-                        onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
-                        placeholder="e.g., 50000"
+                        onChange={(v) => setFormData({ ...formData, credit_limit: v })}
+                        placeholder="e.g., 50,000"
                       />
                     </div>
                     <div className="form-group">
                       <label>{t('cards.currentBalance') || 'Current Balance'}</label>
-                      <input
-                        type="number"
-                        step="0.01"
+                      <FormattedNumberInput
                         value={formData.current_balance}
-                        onChange={(e) => setFormData({ ...formData, current_balance: e.target.value })}
-                        placeholder="e.g., 15000"
+                        onChange={(v) => setFormData({ ...formData, current_balance: v })}
+                        placeholder="e.g., 15,000"
                       />
                     </div>
                     <div className="form-group">
@@ -291,11 +286,9 @@ function NewCardContent() {
                     </div>
                     <div className="form-group">
                       <label>{t('cards.minimumPayment') || 'Minimum Payment'}</label>
-                      <input
-                        type="number"
-                        step="0.01"
+                      <FormattedNumberInput
                         value={formData.minimum_payment}
-                        onChange={(e) => setFormData({ ...formData, minimum_payment: e.target.value })}
+                        onChange={(v) => setFormData({ ...formData, minimum_payment: v })}
                         placeholder="e.g., 500"
                       />
                       <p className="form-hint">{t('cards.minimumPaymentHint') || 'Fixed amount, or use % below'}</p>

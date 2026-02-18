@@ -8,7 +8,8 @@ import { transactionsAPI, Transaction } from '@/app/api/transactions';
 import { cardsAPI, Card } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { formatAmount, currencySymbol } from '@/lib/formatNumber';
+import { formatAmount } from '@/lib/formatNumber';
+import CurrencySymbol from '@/components/ui/CurrencySymbol';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { 
@@ -30,6 +31,7 @@ import LoadingState from '@/components/ui/LoadingState';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -43,6 +45,8 @@ export default function TransactionsPage() {
   const [transactionType, setTransactionType] = useState<string>('all');
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -82,21 +86,25 @@ export default function TransactionsPage() {
     }
   }, [isAuthenticated, selectedCard, transactionType, loadData]);
 
-  const handleDelete = async (id: string) => {
-    if (confirm(t('transactions.deleteConfirm'))) {
-      try {
-        await transactionsAPI.delete(id);
-        setSelectedTransactions(prev => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        await loadData();
-        toast.success(t('success.transactionDeleted'));
-      } catch (err) {
-        console.error('Error deleting transaction:', err);
-        toast.error(t('errors.generic'));
-      }
+  const handleDelete = (id: string) => {
+    setDeleteTarget(id);
+  };
+
+  const confirmDeleteSingle = async () => {
+    if (!deleteTarget) return;
+    setDeleteTarget(null);
+    try {
+      await transactionsAPI.delete(deleteTarget);
+      setSelectedTransactions(prev => {
+        const next = new Set(prev);
+        next.delete(deleteTarget);
+        return next;
+      });
+      await loadData();
+      toast.success(t('success.transactionDeleted'));
+    } catch (err) {
+      console.error('Error deleting transaction:', err);
+      toast.error(t('errors.generic'));
     }
   };
 
@@ -122,12 +130,11 @@ export default function TransactionsPage() {
 
   const handleDeleteSelected = async () => {
     if (selectedTransactions.size === 0) return;
+    setBulkDeleteOpen(true);
+  };
 
-    const confirmMessage = t('transactions.deleteMultipleConfirm', { count: selectedTransactions.size }) || 
-      `Are you sure you want to delete ${selectedTransactions.size} transaction(s)?`;
-    
-    if (!confirm(confirmMessage)) return;
-
+  const confirmDeleteBulk = async () => {
+    setBulkDeleteOpen(false);
     setDeleting(true);
     try {
       const deletePromises = Array.from(selectedTransactions).map(async (id) => {
@@ -174,10 +181,16 @@ export default function TransactionsPage() {
   return (
     <Layout>
       <div>
-        {/* Header */}
-        <div className="mb-8">
-          <h1>{t('transactions.title')}</h1>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t('transactions.subtitle')}</p>
+        {/* Header + Action */}
+        <div className="txn-page-header">
+          <div>
+            <h1>{t('transactions.title')}</h1>
+            <p className="txn-page-subtitle">{t('transactions.subtitle')}</p>
+          </div>
+          <Link href="/sms-parser" className="btn btn-primary">
+            <Plus size={18} />
+            <span>{t('transactions.addTransaction')}</span>
+          </Link>
         </div>
 
         {/* Summary Card */}
@@ -186,7 +199,7 @@ export default function TransactionsPage() {
             <div className="summary-content">
               <div className="summary-label">{t('transactions.totalBalance')}</div>
               <div className="summary-value">
-                {totalAmount >= 0 ? '+' : ''}{formatAmount(totalAmount)} <span className="summary-currency">{currencySymbol('AED')}</span>
+                {totalAmount >= 0 ? '+' : ''}{formatAmount(totalAmount)} <span className="summary-currency"><CurrencySymbol code="AED" size={18} /></span>
               </div>
             </div>
             <div className="summary-icon">
@@ -201,12 +214,12 @@ export default function TransactionsPage() {
           </div>
         )}
 
-        {/* Filters */}
-        <div className="card mb-6">
-          <div className="grid grid-3">
-            <div>
-              <label className="flex items-center gap-2 mb-2">
-                <Filter size={16} />
+        {/* Filters Toolbar */}
+        <div className="txn-toolbar mb-6">
+          <div className="txn-filter-group">
+            <div className="txn-filter">
+              <label className="txn-filter-label">
+                <CreditCard size={14} />
                 {t('transactions.filterByCard')}
               </label>
               <SearchableSelect
@@ -219,9 +232,9 @@ export default function TransactionsPage() {
                 aria-label={t('transactions.filterByCard')}
               />
             </div>
-            <div>
-              <label className="flex items-center gap-2 mb-2">
-                <Filter size={16} />
+            <div className="txn-filter">
+              <label className="txn-filter-label">
+                <Filter size={14} />
                 {t('transactions.filterByType')}
               </label>
               <SearchableSelect
@@ -241,25 +254,15 @@ export default function TransactionsPage() {
                 aria-label={t('transactions.filterByType')}
               />
             </div>
-            <div className="flex items-end">
-              <button
-                onClick={loadData}
-                className="btn btn-secondary"
-                style={{ width: '100%' }}
-              >
-                <RefreshCw size={18} />
-                <span>{t('common.refresh')}</span>
-              </button>
-            </div>
           </div>
-        </div>
-
-        {/* Add Transaction Button */}
-        <div className="mb-6 flex justify-end">
-          <Link href="/sms-parser" className="btn btn-primary">
-            <Plus size={18} />
-            <span>{t('transactions.addTransaction')}</span>
-          </Link>
+          <button
+            onClick={loadData}
+            className="btn txn-refresh-btn"
+            title={t('common.refresh')}
+          >
+            <RefreshCw size={16} />
+            <span>{t('common.refresh')}</span>
+          </button>
         </div>
 
         {/* Bulk Actions Bar */}
@@ -398,7 +401,7 @@ export default function TransactionsPage() {
                         <td className="text-right">
                           <span className="transaction-amount" data-type={txn.transaction_type}>
                             {isExpense ? '-' : '+'}
-                          {formatAmount(txn.amount)} {currencySymbol(txn.currency)}
+                          {formatAmount(txn.amount)} <CurrencySymbol code={txn.currency} size={14} />
                           </span>
                         </td>
                         <td className="text-center">
@@ -419,6 +422,28 @@ export default function TransactionsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title={t('transactions.deleteTransaction') || 'Delete Transaction'}
+        message={t('transactions.deleteConfirm') || 'Are you sure you want to delete this transaction?'}
+        confirmLabel={t('common.delete') || 'Delete'}
+        cancelLabel={t('common.cancel') || 'Cancel'}
+        variant="danger"
+        onConfirm={confirmDeleteSingle}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={bulkDeleteOpen}
+        title={t('transactions.deleteTransactions') || 'Delete Transactions'}
+        message={t('transactions.deleteMultipleConfirm', { count: selectedTransactions.size }) || `Are you sure you want to delete ${selectedTransactions.size} transaction(s)?`}
+        confirmLabel={t('common.delete') || 'Delete'}
+        cancelLabel={t('common.cancel') || 'Cancel'}
+        variant="danger"
+        onConfirm={confirmDeleteBulk}
+        onCancel={() => setBulkDeleteOpen(false)}
+      />
     </Layout>
   );
 }

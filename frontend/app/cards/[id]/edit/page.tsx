@@ -12,6 +12,7 @@ import { extractCardId } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/errors';
 import { UAE_BANKS } from '@/lib/uae-banks';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import FormattedNumberInput from '@/components/ui/FormattedNumberInput';
 
 export default function EditCardPage() {
   const router = useRouter();
@@ -362,12 +363,10 @@ export default function EditCardPage() {
                     <label>
                       {t('cards.availableBalance') || 'Available Balance'}
                     </label>
-                    <input
-                      type="number"
-                      name="available_balance"
-                      step="0.01"
+                    <FormattedNumberInput
                       value={formData.available_balance}
-                      onChange={handleChange}
+                      onChange={(v) => setFormData({...formData, available_balance: v})}
+                      className="form-input"
                       placeholder="0.00"
                     />
                   </div>
@@ -389,26 +388,22 @@ export default function EditCardPage() {
                       <label>
                         {t('cards.creditLimit') || 'Credit Limit'}
                       </label>
-                      <input
-                        type="number"
-                        name="credit_limit"
-                        step="0.01"
+                      <FormattedNumberInput
                         value={formData.credit_limit}
-                        onChange={handleChange}
-                        placeholder="e.g., 50000"
+                        onChange={(v) => setFormData({...formData, credit_limit: v})}
+                        className="form-input"
+                        placeholder="e.g., 50,000"
                       />
                     </div>
                     <div className="form-group">
                       <label>
                         {t('cards.currentBalance') || 'Current Balance'}
                       </label>
-                      <input
-                        type="number"
-                        name="current_balance"
-                        step="0.01"
+                      <FormattedNumberInput
                         value={formData.current_balance}
-                        onChange={handleChange}
-                        placeholder="e.g., 15000"
+                        onChange={(v) => setFormData({...formData, current_balance: v})}
+                        className="form-input"
+                        placeholder="e.g., 15,000"
                       />
                     </div>
                     <div className="form-group">
@@ -443,12 +438,10 @@ export default function EditCardPage() {
                       <label>
                         {t('cards.minimumPayment') || 'Minimum Payment'}
                       </label>
-                      <input
-                        type="number"
-                        name="minimum_payment"
-                        step="0.01"
+                      <FormattedNumberInput
                         value={formData.minimum_payment}
-                        onChange={handleChange}
+                        onChange={(v) => setFormData({...formData, minimum_payment: v})}
+                        className="form-input"
                         placeholder="e.g., 500"
                       />
                       <p className="form-hint">{t('cards.minimumPaymentHint') || 'Fixed amount, or use % below'}</p>

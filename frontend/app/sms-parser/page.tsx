@@ -8,20 +8,29 @@ import { transactionsAPI } from '@/app/api/transactions';
 import api from '@/app/api/client';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { currencySymbol } from '@/lib/formatNumber';
+import CurrencySymbol from '@/components/ui/CurrencySymbol';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import FormattedNumberInput from '@/components/ui/FormattedNumberInput';
 import toast from 'react-hot-toast';
-import { 
-  MessageSquare, 
-  CheckCircle, 
-  AlertCircle, 
+import {
+  MessageSquare,
+  CheckCircle,
+  AlertCircle,
   Loader,
   Upload,
   FileText,
   Image as ImageIcon,
   PenTool,
   X,
-  Edit
+  Edit,
+  CreditCard,
+  DollarSign,
+  Calendar,
+  Store,
+  Tag,
+  FileEdit,
+  ArrowRightLeft,
+  Send
 } from 'lucide-react';
 
 type InputMode = 'text' | 'image' | 'manual';
@@ -337,55 +346,6 @@ export default function TransactionImporterPage() {
                 className="form-input form-textarea"
                 rows={6}
               />
-              <div className="form-example">
-                <p className="form-example-label">{t('addTransaction.exampleLabel')}</p>
-                <div className="form-example-item" onClick={() => {
-                  const example = "Your Cr.Card XXX3287 was used for AED756.76 on 10/02/2026 13:36:02 at ICP Smart Services,ABU DHABI-AE. Avl. Cr.limit is AED2375.81";
-                  navigator.clipboard.writeText(example).then(() => {
-                    setSmsBody(example);
-                    toast.success('Example copied!');
-                  });
-                }}>
-                  <code className="form-example-code">
-                    Your Cr.Card XXX3287 was used for AED756.76 on 10/02/2026 13:36:02 at ICP Smart Services,ABU DHABI-AE. Avl. Cr.limit is AED2375.81
-                  </code>
-                  <span className="form-example-copy">Click to use</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="auto-create-section">
-              <div className="auto-create-header">
-                <h3 className="auto-create-title">{t('addTransaction.autoCreate')}</h3>
-                <label className="auto-create-toggle">
-                  <input
-                    type="checkbox"
-                    checked={autoCreate}
-                    onChange={(e) => setAutoCreate(e.target.checked)}
-                    className="auto-create-checkbox"
-                  />
-                  <span className="auto-create-switch"></span>
-                </label>
-              </div>
-              <p className="auto-create-desc">{t('addTransaction.autoCreateDesc')}</p>
-
-              {autoCreate && (
-                <div className="auto-create-card-select">
-                  <label className="auto-create-card-label">
-                    {t('addTransaction.selectCard')}
-                  </label>
-                  <SearchableSelect
-                    value={selectedCard}
-                    onChange={setSelectedCard}
-                    options={[t('addTransaction.autoDetect'), ...cards.map((c) => `${c.card_name} - ${c.bank_name} (****${c.card_last_four})`)]}
-                    optionValues={['', ...cards.map((c) => c.id)]}
-                    placeholder={t('common.search')}
-                    noMatchesText={t('common.noMatches')}
-                    aria-label={t('addTransaction.selectCard')}
-                  />
-                  <p className="auto-create-card-help">{t('addTransaction.selectCardHelp')}</p>
-                </div>
-              )}
             </div>
 
             <button
@@ -426,12 +386,11 @@ export default function TransactionImporterPage() {
                       <div className="form-row">
                         <div className="form-group">
                           <label className="form-label">{t('transactions.amount')} *</label>
-                          <input
-                            type="number"
-                            step="0.01"
+                          <FormattedNumberInput
                             value={editedData?.amount || ''}
-                            onChange={(e) => setEditedData({ ...editedData, amount: e.target.value })}
+                            onChange={(v) => setEditedData({ ...editedData, amount: v })}
                             className="form-input"
+                            placeholder="0.00"
                           />
                         </div>
                         <div className="form-group">
@@ -498,7 +457,7 @@ export default function TransactionImporterPage() {
                         <div className="parsed-data-item">
                           <span className="parsed-data-label">{t('transactions.amount')}:</span>
                           <p className="parsed-data-value parsed-data-amount">
-                            {parsedData.amount ? `${parsedData.amount} ${currencySymbol(parsedData.currency || 'AED')}` : 'N/A'}
+                            {parsedData.amount ? <>{parsedData.amount} <CurrencySymbol code={parsedData.currency || 'AED'} size={14} /></> : 'N/A'}
                           </p>
                         </div>
                         <div className="parsed-data-item">
@@ -647,31 +606,36 @@ export default function TransactionImporterPage() {
 
         {/* Manual Entry */}
         {inputMode === 'manual' && (
-          <div className="card form-card">
-            <div className="section-header">
-              <PenTool size={20} />
-              <h2 className="section-title">{t('addTransaction.manualEntry')}</h2>
-            </div>
-            <p className="form-description">
-              {t('addTransaction.manualInstructions')}
-            </p>
-
-            <form onSubmit={handleManualSubmit} className="form-layout">
-              <div className="form-group">
-                <label className="form-label">{t('addTransaction.cardOptional')}</label>
-                <SearchableSelect
-                  value={manualForm.card_id}
-                  onChange={(v) => setManualForm({ ...manualForm, card_id: v })}
-                  options={[t('addTransaction.noneCash'), ...cards.map((c) => `${c.card_name} - ****${c.card_last_four}`)]}
-                  optionValues={['', ...cards.map((c) => c.id)]}
-                  placeholder={t('common.search')}
-                  noMatchesText={t('common.noMatches')}
-                />
+          <form onSubmit={handleManualSubmit}>
+            {/* Step 1: Card & Type */}
+            <div className="card manual-form-section">
+              <div className="manual-section-header">
+                <div className="manual-section-number">1</div>
+                <div>
+                  <h3 className="manual-section-title">{t('addTransaction.cardOptional')}</h3>
+                  <p className="manual-section-desc">{t('addTransaction.selectCardHelp') || 'Select the card used for this transaction'}</p>
+                </div>
               </div>
-
-              <div className="form-row">
+              <div className="manual-form-grid">
+                <div className="form-group manual-form-full">
+                  <label className="manual-form-label">
+                    <CreditCard size={15} />
+                    {t('addTransaction.cardOptional')}
+                  </label>
+                  <SearchableSelect
+                    value={manualForm.card_id}
+                    onChange={(v) => setManualForm({ ...manualForm, card_id: v })}
+                    options={[t('addTransaction.noneCash'), ...cards.map((c) => `${c.card_name} - ${c.bank_name} (****${c.card_last_four})`)]}
+                    optionValues={['', ...cards.map((c) => c.id)]}
+                    placeholder={t('common.search')}
+                    noMatchesText={t('common.noMatches')}
+                  />
+                </div>
                 <div className="form-group">
-                  <label className="form-label">{t('addTransaction.transactionType')} *</label>
+                  <label className="manual-form-label">
+                    <ArrowRightLeft size={15} />
+                    {t('addTransaction.transactionType')} *
+                  </label>
                   <SearchableSelect
                     value={manualForm.transaction_type}
                     onChange={(v) => setManualForm({ ...manualForm, transaction_type: v })}
@@ -682,32 +646,10 @@ export default function TransactionImporterPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">{t('addTransaction.amount')} *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={manualForm.amount}
-                    onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })}
-                    className="form-input"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">{t('addTransaction.currency')}</label>
-                  <input
-                    type="text"
-                    value={manualForm.currency}
-                    onChange={(e) => setManualForm({ ...manualForm, currency: e.target.value })}
-                    className="form-input"
-                    maxLength={3}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">{t('addTransaction.transactionDate')} *</label>
+                  <label className="manual-form-label">
+                    <Calendar size={15} />
+                    {t('addTransaction.transactionDate')} *
+                  </label>
                   <input
                     type="date"
                     required
@@ -717,57 +659,115 @@ export default function TransactionImporterPage() {
                   />
                 </div>
               </div>
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">{t('addTransaction.merchantName')}</label>
-                <input
-                  type="text"
-                  value={manualForm.merchant_name}
-                  onChange={(e) => setManualForm({ ...manualForm, merchant_name: e.target.value })}
-                  className="form-input"
-                  placeholder={t('addTransaction.merchantPlaceholder')}
-                />
+            {/* Step 2: Amount */}
+            <div className="card manual-form-section">
+              <div className="manual-section-header">
+                <div className="manual-section-number">2</div>
+                <div>
+                  <h3 className="manual-section-title">{t('addTransaction.amount')} *</h3>
+                  <p className="manual-section-desc">{t('addTransaction.manualInstructions') || 'Enter the transaction amount and currency'}</p>
+                </div>
               </div>
+              <div className="manual-form-grid">
+                <div className="form-group" style={{ flex: 2 }}>
+                  <label className="manual-form-label">
+                    <DollarSign size={15} />
+                    {t('addTransaction.amount')} *
+                  </label>
+                  <FormattedNumberInput
+                    value={manualForm.amount}
+                    onChange={(v) => setManualForm({ ...manualForm, amount: v })}
+                    className="form-input manual-amount-input"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="manual-form-label">{t('addTransaction.currency')}</label>
+                  <input
+                    type="text"
+                    value={manualForm.currency}
+                    onChange={(e) => setManualForm({ ...manualForm, currency: e.target.value.toUpperCase() })}
+                    className="form-input"
+                    maxLength={3}
+                    style={{ textAlign: 'center', fontWeight: 700, letterSpacing: '0.1em' }}
+                  />
+                </div>
+              </div>
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">{t('addTransaction.description')}</label>
-                <textarea
-                  value={manualForm.description}
-                  onChange={(e) => setManualForm({ ...manualForm, description: e.target.value })}
-                  className="form-input form-textarea"
-                  rows={3}
-                  placeholder={t('addTransaction.descriptionPlaceholder')}
-                />
+            {/* Step 3: Details */}
+            <div className="card manual-form-section">
+              <div className="manual-section-header">
+                <div className="manual-section-number">3</div>
+                <div>
+                  <h3 className="manual-section-title">{t('addTransaction.merchantName') || 'Details'}</h3>
+                  <p className="manual-section-desc">{t('addTransaction.descriptionPlaceholder') || 'Additional transaction details'}</p>
+                </div>
               </div>
+              <div className="manual-form-grid">
+                <div className="form-group">
+                  <label className="manual-form-label">
+                    <Store size={15} />
+                    {t('addTransaction.merchantName')}
+                  </label>
+                  <input
+                    type="text"
+                    value={manualForm.merchant_name}
+                    onChange={(e) => setManualForm({ ...manualForm, merchant_name: e.target.value })}
+                    className="form-input"
+                    placeholder={t('addTransaction.merchantPlaceholder')}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="manual-form-label">
+                    <Tag size={15} />
+                    {t('addTransaction.category')}
+                  </label>
+                  <input
+                    type="text"
+                    value={manualForm.category}
+                    onChange={(e) => setManualForm({ ...manualForm, category: e.target.value })}
+                    className="form-input"
+                    placeholder={t('addTransaction.categoryPlaceholder')}
+                  />
+                </div>
+                <div className="form-group manual-form-full">
+                  <label className="manual-form-label">
+                    <FileEdit size={15} />
+                    {t('addTransaction.description')}
+                  </label>
+                  <textarea
+                    value={manualForm.description}
+                    onChange={(e) => setManualForm({ ...manualForm, description: e.target.value })}
+                    className="form-input form-textarea"
+                    rows={3}
+                    placeholder={t('addTransaction.descriptionPlaceholder')}
+                  />
+                </div>
+              </div>
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">{t('addTransaction.category')}</label>
-                <input
-                  type="text"
-                  value={manualForm.category}
-                  onChange={(e) => setManualForm({ ...manualForm, category: e.target.value })}
-                  className="form-input"
-                  placeholder={t('addTransaction.categoryPlaceholder')}
-                />
-              </div>
-
-              <div className="form-actions">
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-full"
-                >
-                  {t('addTransaction.createTransaction')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.push('/transactions')}
-                  className="btn btn-secondary btn-full"
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
-            </form>
-          </div>
+            {/* Submit */}
+            <div className="manual-form-actions">
+              <button
+                type="submit"
+                className="btn btn-primary manual-submit-btn"
+              >
+                <Send size={18} />
+                <span>{t('addTransaction.createTransaction')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/transactions')}
+                className="btn btn-secondary"
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </form>
         )}
 
       </div>

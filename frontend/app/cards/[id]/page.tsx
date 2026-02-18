@@ -7,7 +7,8 @@ import { cardsAPI, Card } from '@/app/api/cards';
 import { transactionsAPI, Transaction } from '@/app/api/transactions';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { formatAmount, formatPercent, currencySymbol } from '@/lib/formatNumber';
+import { formatAmount, formatPercent } from '@/lib/formatNumber';
+import CurrencySymbol from '@/components/ui/CurrencySymbol';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
@@ -350,7 +351,7 @@ export default function CardDetailPage() {
                             <p className="transaction-merchant">{txn.merchant_name || txn.description || t('transactions.transaction')}</p>
                             <p className={`transaction-amount ${isExpense ? 'transaction-amount-expense' : 'transaction-amount-income'}`}>
                               {isExpense ? '-' : '+'}
-                              {formatAmount(txn.amount)} {currencySymbol(txn.currency)}
+                              {formatAmount(txn.amount)} <CurrencySymbol code={txn.currency} size={14} />
                             </p>
                           </div>
                           <div className="transaction-meta">
@@ -371,102 +372,101 @@ export default function CardDetailPage() {
             </div>
           </div>
 
-          {/* Sidebar: one unified card info + summary */}
+          {/* Sidebar */}
           <div className="card-detail-sidebar">
-            <div className="card summary-card">
-              <div className="section-header">
-                <CreditCardIcon size={20} />
-                <h3 className="section-title-small">{t('cards.cardInfo') || 'Card Information'}</h3>
-              </div>
-              <div className="summary-list">
-                {isCredit && card.credit_limit && (
-                  <div className="summary-item">
-                    <p className="summary-item-label">{t('cards.creditLimit')}</p>
-                    <p className="summary-item-value">{formatAmount(card.credit_limit)} {currencySymbol(card.balance_currency)}</p>
-                  </div>
-                )}
+            {/* Financial Summary */}
+            {isCredit && card.credit_limit && (
+              <div className="card sidebar-finance-card">
+                <div className="sidebar-finance-row">
+                  <span className="sidebar-finance-label">{t('cards.creditLimit')}</span>
+                  <span className="sidebar-finance-amount">{formatAmount(card.credit_limit)} <span className="sidebar-finance-currency"><CurrencySymbol code={card.balance_currency} size={14} /></span></span>
+                </div>
                 {card.current_balance !== null && (
-                  <div className="summary-item">
-                    <p className="summary-item-label">{t('cards.outstanding')}</p>
-                    <p className="summary-item-value summary-item-value-danger">{formatAmount(card.current_balance)} {currencySymbol(card.balance_currency)}</p>
+                  <div className="sidebar-finance-row">
+                    <span className="sidebar-finance-label">{t('cards.outstanding')}</span>
+                    <span className="sidebar-finance-amount sidebar-finance-danger">{formatAmount(card.current_balance)} <span className="sidebar-finance-currency"><CurrencySymbol code={card.balance_currency} size={14} /></span></span>
                   </div>
                 )}
                 {card.available_balance !== null && (
-                  <div className="summary-item">
-                    <p className="summary-item-label">{t('cards.available')}</p>
-                    <p className="summary-item-value summary-item-value-success">{formatAmount(card.available_balance)} {currencySymbol(card.balance_currency)}</p>
+                  <div className="sidebar-finance-row">
+                    <span className="sidebar-finance-label">{t('cards.available')}</span>
+                    <span className="sidebar-finance-amount sidebar-finance-success">{formatAmount(card.available_balance)} <span className="sidebar-finance-currency"><CurrencySymbol code={card.balance_currency} size={14} /></span></span>
                   </div>
                 )}
-                {isCredit && card.credit_limit && card.current_balance !== null && (
-                  <div className="summary-item summary-item-full">
-                    <div className="usage-header">
-                      <span className="usage-label">{t('cards.creditUsage')}</span>
-                      <span className="usage-percentage">{formatPercent(usedPercentage)}</span>
+                {card.current_balance !== null && (
+                  <div className="sidebar-usage-section">
+                    <div className="sidebar-usage-header">
+                      <span className="sidebar-usage-label">{t('cards.creditUsage')}</span>
+                      <span className="sidebar-usage-percent">{formatPercent(usedPercentage)}</span>
                     </div>
                     <div className="progress-bar">
                       <div className="progress-fill" style={{ width: `${Math.min(usedPercentage, 100)}%` }}></div>
                     </div>
                   </div>
                 )}
-                {card.payment_due_date && (
-                  <div className="summary-item">
-                    <p className="summary-item-label">{t('cards.paymentDue')}</p>
-                    <p className="summary-item-value">{t('cards.day')} {card.payment_due_date}</p>
-                  </div>
-                )}
-                {card.minimum_payment != null && (
-                  <div className="summary-item">
-                    <p className="summary-item-label">{t('cards.minimumPayment')}</p>
-                    <p className="summary-item-value">{card.minimum_payment_percentage != null ? `${formatPercent(card.minimum_payment_percentage)} ${t('cards.ofAmountDue')}` : `${formatAmount(card.minimum_payment)} ${currencySymbol(card.balance_currency)}`}</p>
-                  </div>
-                )}
               </div>
-              <div className="info-list info-list-border">
-                <div className="info-item">
-                  <p className="info-label">{t('cards.cardType')}</p>
-                  <p className="info-value">{t(`cards.${card.card_type}`) || card.card_type}</p>
+            )}
+
+            {/* Card Details Grid */}
+            <div className="card sidebar-info-card">
+              <h3 className="sidebar-info-title">
+                <CreditCardIcon size={18} />
+                {t('cards.cardInfo') || 'Card Information'}
+              </h3>
+              <div className="sidebar-info-grid">
+                <div className="sidebar-info-item">
+                  <span className="sidebar-info-label">{t('cards.cardType')}</span>
+                  <span className="sidebar-info-value">{t(`cards.${card.card_type}`) || card.card_type}</span>
                 </div>
                 {card.card_network && (
-                  <div className="info-item">
-                    <p className="info-label">{t('cards.network')}</p>
-                    <p className="info-value">{t(`cards.network_${(card.card_network || '').toLowerCase()}`) || card.card_network}</p>
+                  <div className="sidebar-info-item">
+                    <span className="sidebar-info-label">{t('cards.network')}</span>
+                    <span className="sidebar-info-value">{t(`cards.network_${(card.card_network || '').toLowerCase()}`) || card.card_network}</span>
                   </div>
                 )}
                 {card.statement_date && (
-                  <div className="info-item">
-                    <p className="info-label">{t('cards.statementDate')}</p>
-                    <p className="info-value">{t('cards.dayOfMonth').replace('{day}', String(card.statement_date))}</p>
+                  <div className="sidebar-info-item">
+                    <span className="sidebar-info-label">{t('cards.statementDate')}</span>
+                    <span className="sidebar-info-value">{t('cards.dayOfMonth').replace('{day}', String(card.statement_date))}</span>
+                  </div>
+                )}
+                {card.payment_due_date && (
+                  <div className="sidebar-info-item">
+                    <span className="sidebar-info-label">{t('cards.paymentDue')}</span>
+                    <span className="sidebar-info-value">{t('cards.day')} {card.payment_due_date}</span>
+                  </div>
+                )}
+                {card.minimum_payment != null && (
+                  <div className="sidebar-info-item">
+                    <span className="sidebar-info-label">{t('cards.minimumPayment')}</span>
+                    <span className="sidebar-info-value">{card.minimum_payment_percentage != null ? formatPercent(card.minimum_payment_percentage) : <>{formatAmount(card.minimum_payment)} <CurrencySymbol code={card.balance_currency} size={12} /></>}</span>
                   </div>
                 )}
                 {card.notes && (
-                  <div className="info-item">
-                    <p className="info-label">{t('cards.notes')}</p>
-                    <p className="info-value">{card.notes}</p>
+                  <div className="sidebar-info-item sidebar-info-item-full">
+                    <span className="sidebar-info-label">{t('cards.notes')}</span>
+                    <span className="sidebar-info-value">{card.notes}</span>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Actions */}
-            <div className="card actions-card">
-              <div className="section-header">
-                <h3 className="section-title-small">{t('common.actions')}</h3>
-              </div>
-              <div className="actions-list">
-                <button
-                  onClick={() => router.push(`/transactions?card_id=${card.id}`)}
-                  className="btn btn-secondary btn-full"
-                >
-                  {t('cards.viewAllTransactions')}
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="btn btn-danger btn-full"
-                >
-                  <Trash2 size={16} />
-                  <span>{t('common.delete')}</span>
-                </button>
-              </div>
+            <div className="card sidebar-actions-card">
+              <button
+                onClick={() => router.push(`/transactions?card_id=${card.id}`)}
+                className="btn btn-secondary btn-full"
+              >
+                <Receipt size={16} />
+                {t('cards.viewAllTransactions')}
+              </button>
+              <button
+                onClick={handleDelete}
+                className="btn btn-danger btn-full"
+              >
+                <Trash2 size={16} />
+                <span>{t('common.delete')}</span>
+              </button>
             </div>
           </div>
         </div>

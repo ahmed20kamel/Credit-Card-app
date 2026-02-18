@@ -4,8 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { formatAmount, currencySymbol } from '@/lib/formatNumber';
+import { formatAmount } from '@/lib/formatNumber';
+import CurrencySymbol from '@/components/ui/CurrencySymbol';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import FormattedNumberInput from '@/components/ui/FormattedNumberInput';
 import { useAuthStore } from '@/app/store/authStore';
 import { cashAPI } from '@/app/api/cash';
 import toast from 'react-hot-toast';
@@ -148,7 +150,7 @@ export default function CashPage() {
             {t('cash.totalBalance') || 'Total Cash Balance'}
           </div>
           <div className="cash-balance-amount">
-            {loading ? '...' : `${formatAmount(balance)} ${currencySymbol(balanceCurrency)}`}
+            {loading ? '...' : <>{formatAmount(balance)} <CurrencySymbol code={balanceCurrency} size={20} /></>}
           </div>
         </div>
 
@@ -211,14 +213,11 @@ export default function CashPage() {
                 {/* Amount */}
                 <div className="form-group">
                   <label>{t('cash.amount') || 'Amount'} *</label>
-                  <input
-                    type="number"
+                  <FormattedNumberInput
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder={t('cash.amountPlaceholder') || 'Enter amount'}
-                    min="0.01"
-                    step="0.01"
-                    required
+                    onChange={(v) => setAmount(v)}
+                    className="form-input"
+                    placeholder="0.00"
                   />
                 </div>
 
@@ -369,7 +368,7 @@ export default function CashPage() {
                         color: isIncome ? 'var(--success)' : 'var(--danger)',
                       }}
                     >
-                      {isIncome ? '+' : '-'}{formatAmount(entry.amount)} {currencySymbol(entry.currency)}
+                      {isIncome ? '+' : '-'}{formatAmount(entry.amount)} <CurrencySymbol code={entry.currency} size={14} />
                     </span>
                     <button
                       onClick={() => handleDelete(entry.id)}
