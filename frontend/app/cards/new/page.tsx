@@ -13,6 +13,7 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { UAE_BANKS } from '@/lib/uae-banks';
 import { getErrorMessage } from '@/lib/errors';
 import FormattedNumberInput from '@/components/ui/FormattedNumberInput';
+import { scanCardImage } from '@/lib/cardOcr';
 
 function NewCardContent() {
   const router = useRouter();
@@ -22,6 +23,7 @@ function NewCardContent() {
   const [error, setError] = useState('');
   const [cardValid, setCardValid] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
   const [scanPreview, setScanPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -72,32 +74,21 @@ function NewCardContent() {
     }
 
     setScanning(true);
+    setScanProgress(0);
     setError('');
+    setScanPreview(null);
 
     try {
-      // Read file as base64
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+      // Client-side OCR: image NEVER leaves the browser
+      const result = await scanCardImage(file, (progress) => {
+        setScanProgress(progress);
       });
 
-      // Show preview
-      setScanPreview(base64);
-
-      // Send to backend for processing
-      const result = await cardsAPI.scanCardImage(base64);
-
-      if (result.error) {
-        toast.error(result.error);
-        return;
-      }
+      setScanPreview('done');
 
       // Auto-fill extracted data
       const updates: Partial<CreditCardValue> = {};
       if (result.card_number) {
-        // Format card number with spaces every 4 digits
         const formatted = result.card_number.replace(/(\d{4})/g, '$1 ').trim();
         updates.cardNumber = formatted;
       }
@@ -117,7 +108,9 @@ function NewCardContent() {
       }
 
       // Update credit card state
-      setCreditCard(prev => ({ ...prev, ...updates }));
+      if (Object.keys(updates).length > 0) {
+        setCreditCard(prev => ({ ...prev, ...updates }));
+      }
 
       // Update form data
       const formUpdates: Record<string, string> = {};
@@ -125,7 +118,6 @@ function NewCardContent() {
         formUpdates.card_network = result.card_network.toLowerCase();
       }
       if (result.bank_name) {
-        // Try to match with UAE_BANKS list
         const matchedBank = UAE_BANKS.find(bank =>
           bank.toLowerCase().includes(result.bank_name!.toLowerCase()) ||
           result.bank_name!.toLowerCase().includes(bank.toLowerCase())
@@ -137,17 +129,21 @@ function NewCardContent() {
         setFormData(prev => ({ ...prev, ...formUpdates }));
       }
 
-      const fieldsFound = Object.keys(result).filter(k => k !== 'error' && result[k as keyof typeof result]);
-      toast.success(
-        (t('cards.scanSuccess') || 'Card scanned!') + ` ${fieldsFound.length} ` + (t('cards.fieldsExtracted') || 'fields extracted')
-      );
+      const fieldsFound = Object.keys(result).filter(k => result[k as keyof typeof result]);
+      if (fieldsFound.length > 0) {
+        toast.success(
+          (t('cards.scanSuccess') || 'Card scanned!') + ` ${fieldsFound.length} ` + (t('cards.fieldsExtracted') || 'fields extracted')
+        );
+      } else {
+        toast.error(t('cards.scanNoData') || 'Could not read card details. Please try a clearer photo or enter details manually.');
+      }
 
     } catch (err: unknown) {
-      const errorMessage = getErrorMessage(err, t('cards.scanFailed') || 'Failed to scan card');
-      toast.error(errorMessage);
+      console.error('OCR error:', err);
+      toast.error(t('cards.scanFailed') || 'Failed to scan card. Please try a clearer photo.');
     } finally {
       setScanning(false);
-      // Clear file inputs
+      setScanProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (cameraInputRef.current) cameraInputRef.current.value = '';
     }
@@ -254,6 +250,11 @@ function NewCardContent() {
             <div className="scan-loading">
               <Loader2 size={32} className="scan-spinner" />
               <p>{t('cards.scanning') || 'Scanning card...'}</p>
+              {scanProgress > 0 && (
+                <div className="scan-progress-bar">
+                  <div className="scan-progress-fill" style={{ width: `${scanProgress}%` }} />
+                </div>
+              )}
               <p className="scan-loading-hint">{t('cards.scanningHint') || 'Extracting card details from image'}</p>
             </div>
           ) : (
@@ -295,7 +296,7 @@ function NewCardContent() {
 
           <div className="scan-security-note">
             <Shield size={14} />
-            <span>{t('cards.scanSecurityNote') || 'Your card image is processed securely in memory and never stored. All data is encrypted.'}</span>
+            <span>{t('cards.scanSecurityNote') || 'Your card image is processed locally on your device and never uploaded to any server.'}</span>
           </div>
 
           {/* Hidden file inputs */}
