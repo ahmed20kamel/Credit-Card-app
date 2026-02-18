@@ -164,10 +164,10 @@
     "addCardDescription": "Fill in the card details below to add a new card",
     "cardPreview": "Card Preview",
     "scanCard": "Scan Card",
-    "scanCardDesc": "Use your browser's built-in scanner or upload an image",
+    "scanCardDesc": "Scan your card with the camera or upload an image",
     "scanSecure": "Secure",
-    "scanWithBrowser": "Scan with Camera",
-    "scanWithBrowserHint": "Tap the card number field below to use your browser's card scanner",
+    "scanWithCamera": "Scan with Camera",
+    "scanWithCameraHint": "Open camera to scan your card details automatically",
     "scanOrUpload": "or upload an image",
     "takePhoto": "Take Photo",
     "uploadImage": "Upload Image",
@@ -180,7 +180,10 @@
     "scanInvalidFile": "Please select an image file",
     "scanFileTooLarge": "Image must be under 10MB",
     "scanSecurityNote": "Your card image is processed locally on your device and never uploaded to any server.",
-    "scanNoData": "Could not read card details. Please try a clearer photo or enter details manually."
+    "scanNoData": "Could not read card details. Try adjusting the angle or lighting.",
+    "cameraNotAvailable": "Camera not available. Please check permissions.",
+    "scanInstruction": "Position your card within the frame",
+    "scanTiltHint": "Tilt the card slightly to create shadows on embossed numbers"
   },
   "transactions": {
     "title": "Transactions",

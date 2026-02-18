@@ -6,14 +6,15 @@ import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Upload, Loader2, Shield, X, CheckCircle, Smartphone, ScanLine } from 'lucide-react';
+import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Upload, Loader2, Shield, X, CheckCircle, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CreditCard, type CreditCardValue } from '@/components/ui/CreditCard';
+import { CameraCardScanner } from '@/components/ui/CameraCardScanner';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { UAE_BANKS } from '@/lib/uae-banks';
 import { getErrorMessage } from '@/lib/errors';
 import FormattedNumberInput from '@/components/ui/FormattedNumberInput';
-import { scanCardImage } from '@/lib/cardOcr';
+import { scanCardImage, type CardOcrResult } from '@/lib/cardOcr';
 
 function NewCardContent() {
   const router = useRouter();
@@ -25,9 +26,9 @@ function NewCardContent() {
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanPreview, setScanPreview] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const cardNumberInputRef = useRef<HTMLInputElement>(null);
 
   const [creditCard, setCreditCard] = useState<CreditCardValue>({
     cardholderName: '',
@@ -61,14 +62,69 @@ function NewCardContent() {
     }
   }, [isAuthenticated, loadUser, router]);
 
+  // Apply OCR result to card fields
+  const applyScanResult = useCallback((result: CardOcrResult) => {
+    const updates: Partial<CreditCardValue> = {};
+    if (result.card_number) {
+      const formatted = result.card_number.replace(/(\d{4})/g, '$1 ').trim();
+      updates.cardNumber = formatted;
+    }
+    if (result.cardholder_name) {
+      updates.cardholderName = result.cardholder_name;
+    }
+    if (result.expiry_month) {
+      updates.expiryMonth = result.expiry_month.padStart(2, '0');
+    }
+    if (result.expiry_year) {
+      let year = result.expiry_year;
+      if (year.length === 4) year = year.slice(2);
+      updates.expiryYear = year;
+    }
+    if (result.cvv) {
+      updates.cvv = result.cvv;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setCreditCard(prev => ({ ...prev, ...updates }));
+    }
+
+    const formUpdates: Record<string, string> = {};
+    if (result.card_network) {
+      formUpdates.card_network = result.card_network.toLowerCase();
+    }
+    if (result.bank_name) {
+      const matchedBank = UAE_BANKS.find(bank =>
+        bank.toLowerCase().includes(result.bank_name!.toLowerCase()) ||
+        result.bank_name!.toLowerCase().includes(bank.toLowerCase())
+      );
+      formUpdates.bank_name = matchedBank || result.bank_name;
+    }
+
+    if (Object.keys(formUpdates).length > 0) {
+      setFormData(prev => ({ ...prev, ...formUpdates }));
+    }
+
+    const fieldsFound = Object.keys(result).filter(k => result[k as keyof typeof result]);
+    if (fieldsFound.length > 0) {
+      toast.success(
+        (t('cards.scanSuccess') || 'Card scanned!') + ` ${fieldsFound.length} ` + (t('cards.fieldsExtracted') || 'fields extracted')
+      );
+    }
+  }, [t]);
+
+  // Handle camera scanner result
+  const handleCameraResult = useCallback((result: CardOcrResult) => {
+    setScanPreview('done');
+    applyScanResult(result);
+  }, [applyScanResult]);
+
+  // Handle file upload OCR
   const handleFileSelect = useCallback(async (file: File) => {
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error(t('cards.scanInvalidFile') || 'Please select an image file');
       return;
     }
 
-    // Validate file size (10MB max)
     if (file.size > 10 * 1024 * 1024) {
       toast.error(t('cards.scanFileTooLarge') || 'Image must be under 10MB');
       return;
@@ -80,65 +136,17 @@ function NewCardContent() {
     setScanPreview(null);
 
     try {
-      // Client-side OCR: image NEVER leaves the browser
       const result = await scanCardImage(file, (progress) => {
         setScanProgress(progress);
       });
 
       setScanPreview('done');
-
-      // Auto-fill extracted data
-      const updates: Partial<CreditCardValue> = {};
-      if (result.card_number) {
-        const formatted = result.card_number.replace(/(\d{4})/g, '$1 ').trim();
-        updates.cardNumber = formatted;
-      }
-      if (result.cardholder_name) {
-        updates.cardholderName = result.cardholder_name;
-      }
-      if (result.expiry_month) {
-        updates.expiryMonth = result.expiry_month.padStart(2, '0');
-      }
-      if (result.expiry_year) {
-        let year = result.expiry_year;
-        if (year.length === 4) year = year.slice(2);
-        updates.expiryYear = year;
-      }
-      if (result.cvv) {
-        updates.cvv = result.cvv;
-      }
-
-      // Update credit card state
-      if (Object.keys(updates).length > 0) {
-        setCreditCard(prev => ({ ...prev, ...updates }));
-      }
-
-      // Update form data
-      const formUpdates: Record<string, string> = {};
-      if (result.card_network) {
-        formUpdates.card_network = result.card_network.toLowerCase();
-      }
-      if (result.bank_name) {
-        const matchedBank = UAE_BANKS.find(bank =>
-          bank.toLowerCase().includes(result.bank_name!.toLowerCase()) ||
-          result.bank_name!.toLowerCase().includes(bank.toLowerCase())
-        );
-        formUpdates.bank_name = matchedBank || result.bank_name;
-      }
-
-      if (Object.keys(formUpdates).length > 0) {
-        setFormData(prev => ({ ...prev, ...formUpdates }));
-      }
+      applyScanResult(result);
 
       const fieldsFound = Object.keys(result).filter(k => result[k as keyof typeof result]);
-      if (fieldsFound.length > 0) {
-        toast.success(
-          (t('cards.scanSuccess') || 'Card scanned!') + ` ${fieldsFound.length} ` + (t('cards.fieldsExtracted') || 'fields extracted')
-        );
-      } else {
+      if (fieldsFound.length === 0) {
         toast.error(t('cards.scanNoData') || 'Could not read card details. Please try a clearer photo or enter details manually.');
       }
-
     } catch (err: unknown) {
       console.error('OCR error:', err);
       toast.error(t('cards.scanFailed') || 'Failed to scan card. Please try a clearer photo.');
@@ -148,7 +156,7 @@ function NewCardContent() {
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (cameraInputRef.current) cameraInputRef.current.value = '';
     }
-  }, [t]);
+  }, [t, applyScanResult]);
 
   if (!isAuthenticated) {
     return null;
@@ -231,6 +239,13 @@ function NewCardContent() {
           </div>
         </div>
 
+        {/* Camera Scanner Modal */}
+        <CameraCardScanner
+          open={cameraOpen}
+          onClose={() => setCameraOpen(false)}
+          onResult={handleCameraResult}
+        />
+
         {/* Card Scan Section */}
         <div className="card scan-card-section">
           <div className="scan-card-header">
@@ -238,7 +253,7 @@ function NewCardContent() {
               <ScanLine size={22} />
               <div>
                 <h3>{t('cards.scanCard') || 'Scan Card'}</h3>
-                <p className="scan-card-subtitle">{t('cards.scanCardDesc') || 'Use your browser\'s built-in scanner or upload an image'}</p>
+                <p className="scan-card-subtitle">{t('cards.scanCardDesc') || 'Scan your card with the camera or upload an image'}</p>
               </div>
             </div>
             <div className="scan-security-badge">
@@ -247,27 +262,19 @@ function NewCardContent() {
             </div>
           </div>
 
-          {/* Method 1: Browser Native Scanner (Primary) */}
+          {/* Method 1: Camera Scanner (Primary) */}
           <div className="scan-method scan-method-primary">
             <button
               type="button"
               className="scan-btn scan-btn-native"
-              onClick={() => {
-                // Focus the card number input to trigger browser's autofill / card scan
-                const ccInput = document.querySelector<HTMLInputElement>('input[name="cc-number"]');
-                if (ccInput) {
-                  ccInput.focus();
-                  ccInput.click();
-                }
-              }}
+              onClick={() => setCameraOpen(true)}
             >
               <div className="scan-btn-icon-wrap">
-                <Smartphone size={28} />
-                <ScanLine size={16} className="scan-btn-overlay-icon" />
+                <Camera size={28} />
               </div>
               <div className="scan-btn-text">
-                <span className="scan-btn-label">{t('cards.scanWithBrowser') || 'Scan with Camera'}</span>
-                <span className="scan-btn-hint">{t('cards.scanWithBrowserHint') || 'Tap the card number field below to use your browser\'s card scanner'}</span>
+                <span className="scan-btn-label">{t('cards.scanWithCamera') || 'Scan with Camera'}</span>
+                <span className="scan-btn-hint">{t('cards.scanWithCameraHint') || 'Open camera to scan your card details automatically'}</span>
               </div>
             </button>
           </div>
@@ -295,7 +302,7 @@ function NewCardContent() {
                   className="scan-btn scan-btn-camera"
                   onClick={() => cameraInputRef.current?.click()}
                 >
-                  <Camera size={20} />
+                  <Upload size={20} />
                   <span>{t('cards.takePhoto') || 'Take Photo'}</span>
                 </button>
                 <button
