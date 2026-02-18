@@ -5,27 +5,27 @@ export type { Card };
 
 export const cardsAPI = {
   list: async (params?: { bank_name?: string; page?: number; per_page?: number }): Promise<ApiResponse<Card>> => {
-    const response = await api.get('/cards/', { params });
+    const response = await api.get('/cards', { params });
     return response.data;
   },
 
   get: async (id: string, reveal: boolean = false): Promise<Card> => {
-    const response = await api.get(`/cards/${id}/`, { params: { reveal: reveal.toString() } });
+    const response = await api.get(`/cards/${id}`, { params: { reveal: reveal.toString() } });
     return response.data;
   },
 
   create: async (data: CardCreateRequest): Promise<Card> => {
-    const response = await api.post('/cards/', data);
+    const response = await api.post('/cards', data);
     return response.data;
   },
 
   update: async (id: string, data: CardUpdateRequest): Promise<Card> => {
-    const response = await api.put(`/cards/${id}/`, data);
+    const response = await api.put(`/cards/${id}`, data);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/cards/${id}/`);
+    await api.delete(`/cards/${id}`);
   },
 
   parseText: async (text: string) => {
@@ -40,7 +40,7 @@ export const cardsAPI = {
     auto_create?: boolean;
     card_id?: string;
   }) => {
-    const response = await api.post('/cards/parse-sms/', data);
+    const response = await api.post('/cards/parse-sms', data);
     return response.data;
   },
 };

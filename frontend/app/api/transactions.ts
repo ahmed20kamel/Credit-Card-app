@@ -12,31 +12,31 @@ export const transactionsAPI = {
     page?: number;
     per_page?: number;
   }): Promise<ApiResponse<Transaction>> => {
-    const response = await api.get('/transactions/', { params });
+    const response = await api.get('/transactions', { params });
     return response.data;
   },
 
   get: async (id: string): Promise<Transaction> => {
-    const response = await api.get(`/transactions/${id}/`);
+    const response = await api.get(`/transactions/${id}`);
     return response.data;
   },
 
   create: async (data: TransactionCreateRequest): Promise<Transaction> => {
-    const response = await api.post('/transactions/', data);
+    const response = await api.post('/transactions', data);
     return response.data;
   },
 
   update: async (id: string, data: Partial<TransactionCreateRequest>): Promise<Transaction> => {
-    const response = await api.put(`/transactions/${id}/`, data);
+    const response = await api.put(`/transactions/${id}`, data);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/transactions/${id}/`);
+    await api.delete(`/transactions/${id}`);
   },
 
   monthlySummary: async (year: number, month: number): Promise<MonthlySummary> => {
-    const response = await api.get('/transactions/summary/monthly/', {
+    const response = await api.get('/transactions/summary/monthly', {
       params: { year, month },
     });
     return response.data;

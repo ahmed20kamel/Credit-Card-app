@@ -88,7 +88,11 @@
     "viewAll": "عرض الكل",
     "spendingChart": "نظرة عامة على الإنفاق",
     "monthlySpending": "الإنفاق الشهري",
-    "byCategory": "الإنفاق حسب الفئة"
+    "byCategory": "الإنفاق حسب الفئة",
+    "avgTransaction": "متوسط المعاملة",
+    "largestTransaction": "أكبر معاملة",
+    "cardsUsed": "البطاقات المستخدمة",
+    "topCategory": "أعلى فئة"
   },
   "cards": {
     "title": "بطاقاتي",
@@ -139,6 +143,7 @@
     "reveal": "إظهار",
     "hide": "إخفاء",
     "deleteCard": "حذف البطاقة",
+    "deleteCards": "حذف البطاقات",
     "deleteConfirm": "هل أنت متأكد من حذف هذه البطاقة؟",
     "deleteMultipleConfirm": "هل أنت متأكد من حذف {count} بطاقة؟",
     "cardInfo": "معلومات البطاقة",
@@ -186,6 +191,8 @@
     "payment": "دفع",
     "refund": "استرداد",
     "transfer": "تحويل",
+    "deleteTransaction": "حذف المعاملة",
+    "deleteTransactions": "حذف المعاملات",
     "deleteConfirm": "هل أنت متأكد من حذف هذه المعاملة؟",
     "deleteMultipleConfirm": "هل أنت متأكد من حذف {count} معاملة؟",
     "deleteSuccess": "تم حذف المعاملة بنجاح",

@@ -5,6 +5,9 @@ import Providers from './providers'
 export const metadata: Metadata = {
   title: 'CardVault - Credit Card & Cash Management',
   description: 'Manage your credit cards and cash transactions',
+  icons: {
+    icon: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({

@@ -61,7 +61,7 @@ export function SearchableSelect({
 
   const openDropdown = () => {
     setOpen(true);
-    setQuery(hasValueMap ? valueToLabel(value) : value || '');
+    setQuery('');
     setHighlightIndex(0);
   };
 
