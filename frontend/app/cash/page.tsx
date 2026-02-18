@@ -134,14 +134,16 @@ export default function CashPage() {
     <Layout>
       <div>
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2">
-            <Banknote size={28} />
-            <h1>{t('cash.title') || 'Cash Management'}</h1>
+        <div className="page-header-section">
+          <div className="page-header-content">
+            <div className="page-header-icon">
+              <Banknote size={32} />
+            </div>
+            <div className="page-header-text">
+              <h1>{t('cash.title') || 'Cash Management'}</h1>
+              <p className="page-subtitle">{t('cash.subtitle') || 'Track your cash income and expenses'}</p>
+            </div>
           </div>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-            {t('cash.subtitle') || 'Track your cash income and expenses'}
-          </p>
         </div>
 
         {/* Cash Balance Card */}

@@ -1,10 +1,14 @@
 'use client';
 
+import { useTranslations } from '@/lib/i18n';
+
 interface PasswordStrengthProps {
   password: string;
 }
 
 export default function PasswordStrength({ password }: PasswordStrengthProps) {
+  const { t } = useTranslations();
+
   const getStrength = (pwd: string): { level: number; label: string; color: string } => {
     if (!pwd) return { level: 0, label: '', color: '' };
     let score = 0;
@@ -14,10 +18,10 @@ export default function PasswordStrength({ password }: PasswordStrengthProps) {
     if (/[0-9]/.test(pwd)) score++;
     if (/[^A-Za-z0-9]/.test(pwd)) score++;
 
-    if (score <= 1) return { level: 1, label: 'Weak', color: 'var(--danger)' };
-    if (score <= 2) return { level: 2, label: 'Fair', color: 'var(--warning)' };
-    if (score <= 3) return { level: 3, label: 'Good', color: 'var(--primary)' };
-    return { level: 4, label: 'Strong', color: 'var(--success)' };
+    if (score <= 1) return { level: 1, label: t('settings.passwordWeak') || 'Weak', color: 'var(--danger)' };
+    if (score <= 2) return { level: 2, label: t('settings.passwordFair') || 'Fair', color: 'var(--warning)' };
+    if (score <= 3) return { level: 3, label: t('settings.passwordGood') || 'Good', color: 'var(--primary)' };
+    return { level: 4, label: t('settings.passwordStrong') || 'Strong', color: 'var(--success)' };
   };
 
   const strength = getStrength(password);

@@ -154,10 +154,15 @@ export default function DashboardPage() {
     <Layout>
       <div>
         {/* Header */}
-        <div className="page-header">
-          <div>
-            <h1>{t('dashboard.title')}</h1>
-            <p className="text-secondary">{t('dashboard.subtitle')}</p>
+        <div className="page-header-section">
+          <div className="page-header-content">
+            <div className="page-header-icon">
+              <BarChart3 size={32} />
+            </div>
+            <div className="page-header-text">
+              <h1>{t('dashboard.title')}</h1>
+              <p className="page-subtitle">{t('dashboard.subtitle')}</p>
+            </div>
           </div>
         </div>
 
@@ -211,8 +216,8 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="month" stroke="var(--text-secondary)" fontSize={12} />
-                    <YAxis stroke="var(--text-secondary)" fontSize={12} />
+                    <XAxis dataKey="month" stroke="var(--text-secondary)" tick={{ fontSize: '0.75rem', letterSpacing: 'normal' }} />
+                    <YAxis stroke="var(--text-secondary)" tick={{ fontSize: '0.75rem', letterSpacing: 'normal' }} />
                     <Tooltip
                       contentStyle={{
                         background: 'var(--bg)',
@@ -221,7 +226,7 @@ export default function DashboardPage() {
                         color: 'var(--text)',
                       }}
                     />
-                    <Legend />
+                    <Legend wrapperStyle={{ fontSize: '0.8rem', letterSpacing: 'normal' }} />
                     <Line type="monotone" dataKey="spent" stroke="#DC2626" strokeWidth={2} name={t('dashboard.totalSpent')} dot={{ r: 4 }} />
                     <Line type="monotone" dataKey="income" stroke="#059669" strokeWidth={2} name={t('dashboard.totalIncome')} dot={{ r: 4 }} />
                   </LineChart>
@@ -243,6 +248,7 @@ export default function DashboardPage() {
                       outerRadius={80}
                       fill="#888"
                       dataKey="value"
+                      style={{ fontSize: '0.75rem', letterSpacing: 'normal' }}
                     >
                       {pieData.map((_entry, index) => (
                         <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />

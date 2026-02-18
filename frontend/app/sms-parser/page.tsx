@@ -409,8 +409,8 @@ export default function TransactionImporterPage() {
                         <SearchableSelect
                           value={editedData?.transaction_type || 'purchase'}
                           onChange={(v) => setEditedData({ ...editedData, transaction_type: v })}
-                          options={[t('transactions.purchase'), t('transactions.withdrawal'), t('transactions.payment'), t('transactions.refund'), t('transactions.transfer')]}
-                          optionValues={['purchase', 'withdrawal', 'payment', 'refund', 'transfer']}
+                          options={[t('transactions.purchase'), t('transactions.withdrawal'), t('transactions.payment'), t('transactions.refund'), t('transactions.transfer'), t('transactions.deposit')]}
+                          optionValues={['purchase', 'withdrawal', 'payment', 'refund', 'transfer', 'deposit']}
                           placeholder={t('common.search')}
                           noMatchesText={t('common.noMatches')}
                         />
@@ -639,8 +639,8 @@ export default function TransactionImporterPage() {
                   <SearchableSelect
                     value={manualForm.transaction_type}
                     onChange={(v) => setManualForm({ ...manualForm, transaction_type: v })}
-                    options={[t('transactions.purchase'), t('transactions.withdrawal'), t('transactions.payment'), t('transactions.refund'), t('transactions.transfer')]}
-                    optionValues={['purchase', 'withdrawal', 'payment', 'refund', 'transfer']}
+                    options={[t('transactions.purchase'), t('transactions.withdrawal'), t('transactions.payment'), t('transactions.refund'), t('transactions.transfer'), t('transactions.deposit')]}
+                    optionValues={['purchase', 'withdrawal', 'payment', 'refund', 'transfer', 'deposit']}
                     placeholder={t('common.search')}
                     noMatchesText={t('common.noMatches')}
                   />

@@ -182,15 +182,22 @@ export default function TransactionsPage() {
     <Layout>
       <div>
         {/* Header + Action */}
-        <div className="txn-page-header">
-          <div>
-            <h1>{t('transactions.title')}</h1>
-            <p className="txn-page-subtitle">{t('transactions.subtitle')}</p>
+        <div className="page-header-section">
+          <div className="page-header-content">
+            <div className="page-header-icon">
+              <Wallet size={32} />
+            </div>
+            <div className="page-header-text">
+              <h1>{t('transactions.title')}</h1>
+              <p className="page-subtitle">{t('transactions.subtitle')}</p>
+            </div>
+            <div className="page-header-actions">
+              <Link href="/sms-parser" className="btn btn-primary">
+                <Plus size={18} />
+                <span>{t('transactions.addTransaction')}</span>
+              </Link>
+            </div>
           </div>
-          <Link href="/sms-parser" className="btn btn-primary">
-            <Plus size={18} />
-            <span>{t('transactions.addTransaction')}</span>
-          </Link>
         </div>
 
         {/* Summary Card */}
@@ -247,8 +254,9 @@ export default function TransactionsPage() {
                   t('transactions.payment'),
                   t('transactions.refund'),
                   t('transactions.transfer'),
+                  t('transactions.deposit'),
                 ]}
-                optionValues={['all', 'purchase', 'withdrawal', 'payment', 'refund', 'transfer']}
+                optionValues={['all', 'purchase', 'withdrawal', 'payment', 'refund', 'transfer', 'deposit']}
                 placeholder={t('common.search')}
                 noMatchesText={t('common.noMatches')}
                 aria-label={t('transactions.filterByType')}

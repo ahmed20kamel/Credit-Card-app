@@ -100,6 +100,7 @@ class Transaction(models.Model):
         ('payment', 'Payment'),
         ('refund', 'Refund'),
         ('transfer', 'Transfer'),
+        ('deposit', 'Deposit'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
