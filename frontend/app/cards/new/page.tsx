@@ -81,7 +81,7 @@ function NewCardContent() {
       const data = {
         card_name: formData.card_name || '',
         bank_name: formData.bank_name || '',
-        card_type: formData.card_type || 'credit',
+        card_type: (formData.card_type || 'credit') as 'credit' | 'debit' | 'prepaid',
         card_network: formData.card_network || undefined,
         card_number: creditCard.cardNumber.replace(/\s/g, ''),
         cardholder_name: creditCard.cardholderName || undefined,

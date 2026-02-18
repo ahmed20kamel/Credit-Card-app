@@ -229,7 +229,7 @@ export default function EditCardPage() {
                     </label>
                     <SearchableSelect
                       value={formData.card_type}
-                      onChange={(v) => setFormData((prev) => ({ ...prev, card_type: v }))}
+                      onChange={(v) => setFormData((prev) => ({ ...prev, card_type: v as 'credit' | 'debit' | 'prepaid' }))}
                       options={[t('cards.credit'), t('cards.debit'), t('cards.prepaid')]}
                       optionValues={['credit', 'debit', 'prepaid']}
                       placeholder={t('common.search')}
