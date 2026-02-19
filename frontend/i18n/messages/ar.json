@@ -372,7 +372,18 @@
     "passwordWeak": "ضعيفة",
     "passwordFair": "مقبولة",
     "passwordGood": "جيدة",
-    "passwordStrong": "قوية"
+    "passwordStrong": "قوية",
+    "biometricSection": "تسجيل الدخول بالبصمة",
+    "biometricDesc": "سجّل دخولك ببصمة الإصبع أو Face ID",
+    "enableBiometric": "تفعيل تسجيل الدخول بالبصمة",
+    "addBiometric": "إضافة جهاز آخر",
+    "noBiometric": "لا توجد بصمات مسجّلة بعد",
+    "biometricEnabled": "تم تفعيل تسجيل الدخول بالبصمة!",
+    "biometricRemoved": "تم حذف البصمة",
+    "biometricFailed": "فشل تسجيل البصمة",
+    "removeBiometric": "حذف",
+    "lastUsed": "آخر استخدام",
+    "registeredOn": "تاريخ التسجيل"
   },
   "cash": {
     "title": "إدارة النقد",

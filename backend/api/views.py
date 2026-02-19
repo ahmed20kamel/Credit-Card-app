@@ -1555,3 +1555,32 @@ def webauthn_login_verify(request):
         'refresh_token': str(refresh),
         'token_type': 'bearer',
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def webauthn_list_credentials(request):
+    """List all registered biometric credentials for the current user."""
+    credentials = WebAuthnCredential.objects.filter(user=request.user).order_by('-created_at')
+    data = [
+        {
+            'id': str(cred.id),
+            'device_name': cred.device_name or 'Unknown Device',
+            'created_at': cred.created_at.isoformat() if cred.created_at else None,
+            'last_used_at': cred.last_used_at.isoformat() if cred.last_used_at else None,
+        }
+        for cred in credentials
+    ]
+    return Response(data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def webauthn_delete_credential(request, pk):
+    """Delete a specific biometric credential belonging to the current user."""
+    try:
+        credential = WebAuthnCredential.objects.get(id=pk, user=request.user)
+        credential.delete()
+        return Response({'detail': 'Credential deleted.'}, status=status.HTTP_200_OK)
+    except WebAuthnCredential.DoesNotExist:
+        return Response({'detail': 'Credential not found.'}, status=status.HTTP_404_NOT_FOUND)

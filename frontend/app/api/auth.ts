@@ -153,4 +153,13 @@ export const authAPI = {
     }
     return res.data;
   },
+
+  getBiometricCredentials: async (): Promise<Array<{ id: string; device_name: string; created_at: string | null; last_used_at: string | null }>> => {
+    const res = await api.get('/auth/webauthn/credentials');
+    return res.data;
+  },
+
+  deleteBiometricCredential: async (id: string): Promise<void> => {
+    await api.delete(`/auth/webauthn/credentials/${id}`);
+  },
 };

@@ -6,6 +6,7 @@ from .views import (
     ChatSessionViewSet, ChatMessageViewSet, chat_send,
     webauthn_register_options, webauthn_register_verify,
     webauthn_login_options, webauthn_login_verify,
+    webauthn_list_credentials, webauthn_delete_credential,
 )
 
 router = DefaultRouter()
@@ -33,5 +34,7 @@ urlpatterns = [
     path('auth/webauthn/register/verify/', webauthn_register_verify, name='webauthn-register-verify'),
     path('auth/webauthn/login/options/', webauthn_login_options, name='webauthn-login-options'),
     path('auth/webauthn/login/verify/', webauthn_login_verify, name='webauthn-login-verify'),
+    path('auth/webauthn/credentials/', webauthn_list_credentials, name='webauthn-credentials'),
+    path('auth/webauthn/credentials/<int:pk>/', webauthn_delete_credential, name='webauthn-delete-credential'),
     path('', include(router.urls)),
 ]

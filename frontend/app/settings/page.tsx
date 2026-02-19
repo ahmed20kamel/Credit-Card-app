@@ -6,7 +6,6 @@ import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
 import { useAuthStore } from '@/app/store/authStore';
 import { authAPI } from '@/app/api/auth';
-import api from '@/app/api/client';
 import { getErrorMessage } from '@/lib/errors';
 import { getTheme, setTheme, type Theme } from '@/lib/theme';
 import toast from 'react-hot-toast';
@@ -25,6 +24,7 @@ import {
   Check,
   Save,
   Fingerprint,
+  Trash2,
 } from 'lucide-react';
 import PasswordStrength from '@/components/ui/PasswordStrength';
 
@@ -45,8 +45,10 @@ export default function SettingsPage() {
   const [currentTheme, setCurrentTheme] = useState<Theme>('system');
 
   const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [biometricRegistered, setBiometricRegistered] = useState(false);
+  const [biometricCredentials, setBiometricCredentials] = useState<Array<{ id: string; device_name: string; created_at: string | null; last_used_at: string | null }>>([]);
   const [biometricLoading, setBiometricLoading] = useState(false);
+  const [biometricFetching, setBiometricFetching] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -65,15 +67,23 @@ export default function SettingsPage() {
     setCurrentTheme(getTheme());
   }, []);
 
+  const loadBiometricCredentials = async () => {
+    if (!isAuthenticated) return;
+    setBiometricFetching(true);
+    try {
+      const creds = await authAPI.getBiometricCredentials();
+      setBiometricCredentials(creds);
+    } catch {
+      // silently fail — endpoint might not exist yet
+    } finally {
+      setBiometricFetching(false);
+    }
+  };
+
   useEffect(() => {
     authAPI.checkBiometricSupport().then(setBiometricAvailable);
-    // Check if user has registered credentials
-    if (isAuthenticated) {
-      api.get('/auth/webauthn/register/options').then(() => {
-        // If we can get options, the endpoint exists, check localStorage
-        setBiometricRegistered(localStorage.getItem('biometric_registered') === 'true');
-      }).catch(() => {});
-    }
+    loadBiometricCredentials();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
   const handleBiometricRegister = async () => {
@@ -81,16 +91,28 @@ export default function SettingsPage() {
     try {
       const result = await authAPI.registerBiometric();
       if (result.success) {
-        setBiometricRegistered(true);
-        localStorage.setItem('biometric_registered', 'true');
         toast.success(t('settings.biometricEnabled') || 'Biometric login enabled!');
+        await loadBiometricCredentials();
       } else {
-        toast.error(result.error || 'Registration failed');
+        toast.error(result.error || t('settings.biometricFailed') || 'Registration failed');
       }
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, 'Failed to register biometric'));
     } finally {
       setBiometricLoading(false);
+    }
+  };
+
+  const handleBiometricDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await authAPI.deleteBiometricCredential(id);
+      toast.success(t('settings.biometricRemoved') || 'Biometric credential removed');
+      setBiometricCredentials(prev => prev.filter(c => c.id !== id));
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to remove credential'));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -384,33 +406,80 @@ export default function SettingsPage() {
             {biometricAvailable && (
               <div className="card settings-card">
                 <div className="settings-card-header">
-                  <div className="settings-card-icon security">
+                  <div className="settings-card-icon biometric">
                     <Fingerprint size={20} />
                   </div>
                   <div>
                     <h2 className="settings-card-title">{t('settings.biometricSection') || 'Biometric Login'}</h2>
-                    <p className="settings-card-desc">{t('settings.biometricDesc') || 'Use fingerprint or Face ID to sign in'}</p>
+                    <p className="settings-card-desc">{t('settings.biometricDesc') || 'Sign in with fingerprint or Face ID'}</p>
                   </div>
                 </div>
 
                 <div className="settings-biometric-content">
-                  {biometricRegistered ? (
-                    <div className="settings-biometric-status enabled">
-                      <Check size={20} />
-                      <span>{t('settings.biometricEnabled') || 'Biometric login is enabled'}</span>
+                  {biometricFetching ? (
+                    <div className="settings-biometric-loading">
+                      <span className="settings-biometric-spinner" />
+                      <span>{t('common.loading') || 'Loading...'}</span>
                     </div>
+                  ) : biometricCredentials.length > 0 ? (
+                    <>
+                      <div className="settings-biometric-devices">
+                        {biometricCredentials.map((cred) => (
+                          <div key={cred.id} className="settings-biometric-device">
+                            <div className="settings-biometric-device-icon">
+                              <Fingerprint size={18} />
+                            </div>
+                            <div className="settings-biometric-device-info">
+                              <span className="settings-biometric-device-name">{cred.device_name}</span>
+                              {cred.last_used_at && (
+                                <span className="settings-biometric-device-date">
+                                  {t('settings.lastUsed') || 'Last used'}: {new Date(cred.last_used_at).toLocaleDateString()}
+                                </span>
+                              )}
+                              {!cred.last_used_at && cred.created_at && (
+                                <span className="settings-biometric-device-date">
+                                  {t('settings.registeredOn') || 'Registered'}: {new Date(cred.created_at).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              className="settings-biometric-delete-btn"
+                              onClick={() => handleBiometricDelete(cred.id)}
+                              disabled={deletingId === cred.id}
+                              title={t('settings.removeBiometric') || 'Remove'}
+                            >
+                              {deletingId === cred.id ? <span className="settings-biometric-spinner small" /> : <Trash2 size={15} />}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleBiometricRegister}
+                        disabled={biometricLoading}
+                        className="settings-biometric-add-btn"
+                      >
+                        <Fingerprint size={15} />
+                        {biometricLoading ? (t('common.loading') || 'Setting up...') : (t('settings.addBiometric') || 'Add another device')}
+                      </button>
+                    </>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={handleBiometricRegister}
-                      disabled={biometricLoading}
-                      className="btn btn-primary settings-save-btn"
-                    >
-                      <Fingerprint size={16} />
-                      {biometricLoading
-                        ? (t('common.saving') || 'Setting up...')
-                        : (t('settings.enableBiometric') || 'Enable Biometric Login')}
-                    </button>
+                    <div className="settings-biometric-empty">
+                      <div className="settings-biometric-empty-icon">
+                        <Fingerprint size={32} />
+                      </div>
+                      <p className="settings-biometric-empty-text">{t('settings.noBiometric') || 'No biometric credentials registered'}</p>
+                      <button
+                        type="button"
+                        onClick={handleBiometricRegister}
+                        disabled={biometricLoading}
+                        className="btn btn-primary settings-save-btn"
+                      >
+                        <Fingerprint size={16} />
+                        {biometricLoading ? (t('common.loading') || 'Setting up...') : (t('settings.enableBiometric') || 'Enable Biometric Login')}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

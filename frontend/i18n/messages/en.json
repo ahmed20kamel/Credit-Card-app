@@ -373,7 +373,18 @@
     "passwordWeak": "Weak",
     "passwordFair": "Fair",
     "passwordGood": "Good",
-    "passwordStrong": "Strong"
+    "passwordStrong": "Strong",
+    "biometricSection": "Biometric Login",
+    "biometricDesc": "Sign in with fingerprint or Face ID",
+    "enableBiometric": "Enable Biometric Login",
+    "addBiometric": "Add Another Device",
+    "noBiometric": "No biometric credentials registered yet",
+    "biometricEnabled": "Biometric login enabled!",
+    "biometricRemoved": "Biometric credential removed",
+    "biometricFailed": "Biometric registration failed",
+    "removeBiometric": "Remove",
+    "lastUsed": "Last used",
+    "registeredOn": "Registered"
   },
   "cash": {
     "title": "Cash Management",
