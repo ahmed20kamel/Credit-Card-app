@@ -1592,21 +1592,13 @@ def webauthn_delete_credential(request, pk):
 
 REALTIME_MODEL = 'gpt-4o-realtime-preview-2024-12-17'
 
-# System instructions replicated from the stored prompt.
-# Note: 'prompt_id' is NOT a valid field for /v1/realtime/sessions REST API —
-# it is only used in the OpenAI Playground UI. We set instructions + voice here instead.
-REALTIME_INSTRUCTIONS = (
-    "You are a smart financial assistant for CardVault. "
-    "Always respond in the SAME language the user uses — Arabic if they speak Arabic, "
-    "English if they speak English. Keep answers short, clear and helpful."
-)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def realtime_session(request):
     """
-    Create an ephemeral OpenAI Realtime session token.
+    Create an ephemeral OpenAI Realtime session token injected with the user's full
+    financial context (same data as chat_send) + tools for adding transactions/cards.
     The API key stays on the server; the browser only receives the short-lived client_secret.
     """
     import urllib.request
@@ -1619,14 +1611,174 @@ def realtime_session(request):
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
-    # Valid voices for gpt-4o-realtime: alloy, ash, ballad, coral, echo, sage, shimmer, verse
-    # "Marin" from the Playground maps closest to "verse"
+    # ── Build financial context (identical to chat_send) ──────────────────────
+    user_cards = Card.objects.filter(user=request.user, is_deleted=False)
+    cards_context = []
+    card_id_map = {}   # last_four / name → card id (for tool execution)
+    for card in user_cards:
+        card_id_map[card.card_name.lower()] = str(card.id)
+        if card.card_last_four:
+            card_id_map[card.card_last_four] = str(card.id)
+        card_info = {
+            'id': str(card.id),
+            'name': card.card_name,
+            'bank': card.bank_name,
+            'type': card.card_type,
+            'last_four': card.card_last_four,
+            'network': card.card_network,
+            'credit_limit': float(card.credit_limit) if card.credit_limit else None,
+            'current_balance': float(card.current_balance) if card.current_balance else None,
+            'available_balance': float(card.available_balance) if card.available_balance else None,
+            'currency': card.balance_currency,
+            'payment_due_date': card.payment_due_date,
+            'minimum_payment': float(card.minimum_payment) if card.minimum_payment else None,
+        }
+        if card.card_benefits:
+            try:
+                card_info['benefits'] = json.loads(card.card_benefits)
+            except json.JSONDecodeError:
+                pass
+        cards_context.append(card_info)
+
+    recent_txns = Transaction.objects.filter(
+        user=request.user, is_deleted=False
+    ).select_related('card').order_by('-transaction_date')[:30]
+    txn_context = [{
+        'type': t.transaction_type, 'amount': float(t.amount),
+        'currency': t.currency, 'merchant': t.merchant_name,
+        'date': t.transaction_date.strftime('%Y-%m-%d') if t.transaction_date else None,
+        'card': t.card.card_name if t.card else 'Cash',
+        'category': t.category,
+    } for t in recent_txns]
+
+    cash_qs = CashEntry.objects.filter(user=request.user, is_deleted=False)
+    cash_in  = cash_qs.filter(entry_type='income').aggregate(s=Sum('amount'))['s'] or 0
+    cash_out = cash_qs.filter(entry_type='expense').aggregate(s=Sum('amount'))['s'] or 0
+    cash_balance = float(cash_in - cash_out)
+
+    today = timezone.now().strftime('%Y-%m-%d')
+
+    instructions = f"""You are CardVault AI, a smart voice financial assistant.
+
+## User's Cards ({len(cards_context)} cards):
+{json.dumps(cards_context, ensure_ascii=False, default=str)}
+
+## Recent Transactions (last {len(txn_context)}):
+{json.dumps(txn_context, ensure_ascii=False, default=str)}
+
+## Cash Balance: {cash_balance} AED
+
+## Rules:
+- Always respond in the SAME language the user speaks — Arabic if Arabic, English if English.
+- Be concise and clear — this is a voice conversation.
+- Spell out numbers clearly. Format amounts: e.g. "ألف وخمسمائة درهم" or "1,500 AED".
+- Today is {today}.
+- Never make up data — only use the financial data provided above.
+- You CAN add transactions and cards — use the provided functions when asked.
+- When you add something, confirm it verbally to the user."""
+
+    # ── Realtime Tools (Function Calling) ─────────────────────────────────────
+    tools = [
+        {
+            'type': 'function',
+            'name': 'add_transaction',
+            'description': (
+                'Add a new financial transaction for the user. '
+                'Call this when the user says they spent money, received money, '
+                'or wants to record any purchase, payment, or transfer.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'amount': {
+                        'type': 'number',
+                        'description': 'Transaction amount (positive number)',
+                    },
+                    'merchant_name': {
+                        'type': 'string',
+                        'description': 'Merchant or transaction description',
+                    },
+                    'transaction_type': {
+                        'type': 'string',
+                        'enum': ['purchase', 'withdrawal', 'payment', 'refund', 'transfer', 'deposit'],
+                        'description': 'Type of transaction',
+                    },
+                    'card_last_four': {
+                        'type': 'string',
+                        'description': 'Last 4 digits of the card used, if applicable',
+                    },
+                    'currency': {
+                        'type': 'string',
+                        'description': 'Currency code (default: AED)',
+                    },
+                    'category': {
+                        'type': 'string',
+                        'enum': ['Shopping', 'Food', 'Transport', 'Bills', 'Entertainment', 'Transfer', 'ATM', 'Other'],
+                    },
+                    'transaction_date': {
+                        'type': 'string',
+                        'description': f'Date YYYY-MM-DD (default: today {today})',
+                    },
+                },
+                'required': ['amount', 'merchant_name', 'transaction_type'],
+            },
+        },
+        {
+            'type': 'function',
+            'name': 'add_card',
+            'description': (
+                'Add a new credit or debit card for the user. '
+                'Call this when the user asks to save or add a new card.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'card_name': {
+                        'type': 'string',
+                        'description': 'Descriptive card name e.g. "Visa Platinum"',
+                    },
+                    'bank_name': {
+                        'type': 'string',
+                        'description': 'Issuing bank name',
+                    },
+                    'card_type': {
+                        'type': 'string',
+                        'enum': ['credit', 'debit', 'prepaid'],
+                    },
+                    'card_network': {
+                        'type': 'string',
+                        'enum': ['visa', 'mastercard', 'amex', 'other'],
+                    },
+                    'card_last_four': {
+                        'type': 'string',
+                        'description': 'Last 4 digits of the card',
+                    },
+                    'credit_limit': {
+                        'type': 'number',
+                        'description': 'Credit limit (credit cards only)',
+                    },
+                    'currency': {
+                        'type': 'string',
+                        'description': 'Card currency (default: AED)',
+                    },
+                    'payment_due_date': {
+                        'type': 'integer',
+                        'description': 'Day of month for payment due date (1-31)',
+                    },
+                },
+                'required': ['card_name', 'bank_name', 'card_type'],
+            },
+        },
+    ]
+
     payload = {
         'model': REALTIME_MODEL,
         'modalities': ['audio', 'text'],
         'voice': 'verse',
-        'instructions': REALTIME_INSTRUCTIONS,
-        'max_response_output_tokens': 768,
+        'instructions': instructions,
+        'tools': tools,
+        'tool_choice': 'auto',
+        'max_response_output_tokens': 512,
         'input_audio_transcription': {
             'model': 'gpt-4o-mini-transcribe',
         },
@@ -1641,20 +1793,22 @@ def realtime_session(request):
     try:
         req = urllib.request.Request(
             'https://api.openai.com/v1/realtime/sessions',
-            data=json.dumps(payload).encode('utf-8'),
+            data=json.dumps(payload, default=str).encode('utf-8'),
             headers={
                 'Authorization': f'Bearer {openai_key}',
                 'Content-Type': 'application/json',
             },
             method='POST',
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read().decode('utf-8'))
 
         return Response({
             'client_secret': data['client_secret']['value'],
             'expires_at': data['client_secret'].get('expires_at'),
             'model': REALTIME_MODEL,
+            # Pass card_id_map to frontend so it can resolve card names → IDs for tool calls
+            'card_id_map': card_id_map,
         })
 
     except urllib.error.HTTPError as e:

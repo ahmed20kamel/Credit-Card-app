@@ -8444,6 +8444,23 @@ html[dir="rtl"] .credit-card-form-ltr * {
   line-height: 1.5;
 }
 
+/* Action confirmation line (transaction/card added) */
+.realtime-line-action { width: 100%; }
+
+.realtime-action-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #10B981;
+  background: rgba(16,185,129,0.08);
+  border: 1px solid rgba(16,185,129,0.2);
+  border-radius: 8px;
+  padding: 5px 10px;
+  width: 100%;
+}
+
 /* ── Controls ── */
 .realtime-controls {
   display: flex;
