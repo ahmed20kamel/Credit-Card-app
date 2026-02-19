@@ -1260,18 +1260,35 @@ def _b64url_decode(s: str) -> bytes:
 
 def _get_rp_id(request):
     """Get the WebAuthn Relying Party ID.
-    Uses WEBAUTHN_RP_ID setting, or auto-detects from the request Origin header.
+    Priority:
+    1. WEBAUTHN_RP_ID env var (if not 'localhost')
+    2. rp_id query param or POST body field (sent by frontend)
+    3. HTTP_ORIGIN header
+    4. HTTP_REFERER header
+    5. Falls back to configured value ('localhost')
     """
+    from urllib.parse import urlparse
+
     configured = getattr(django_settings, 'WEBAUTHN_RP_ID', 'localhost')
     if configured and configured != 'localhost':
         return configured
-    # Auto-detect from Origin header
-    origin = request.META.get('HTTP_ORIGIN', '')
-    if origin:
-        from urllib.parse import urlparse
-        parsed = urlparse(origin)
-        if parsed.hostname and parsed.hostname != 'localhost':
-            return parsed.hostname
+
+    # Check query params (GET requests) or POST body
+    rp_id_param = (
+        request.query_params.get('rp_id')
+        or (request.data.get('rp_id') if hasattr(request, 'data') else None)
+    )
+    if rp_id_param and rp_id_param != 'localhost':
+        return rp_id_param
+
+    # Auto-detect from Origin/Referer header
+    for header in ('HTTP_ORIGIN', 'HTTP_REFERER'):
+        header_val = request.META.get(header, '')
+        if header_val:
+            parsed = urlparse(header_val)
+            if parsed.hostname and parsed.hostname != 'localhost':
+                return parsed.hostname
+
     return configured
 
 

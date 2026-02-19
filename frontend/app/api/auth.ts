@@ -69,8 +69,8 @@ export const authAPI = {
 
   registerBiometric: async (): Promise<{ success: boolean; error?: string }> => {
     try {
-      // 1. Get registration options from server
-      const optRes = await api.get('/auth/webauthn/register/options');
+      // 1. Get registration options from server — send rp_id so backend uses the correct domain
+      const optRes = await api.get('/auth/webauthn/register/options', { params: { rp_id: window.location.hostname } });
       const options = optRes.data;
 
       // 2. Decode challenge and user.id from base64url
@@ -78,10 +78,12 @@ export const authAPI = {
       const userId = _b64urlToBuffer(options.user.id);
 
       // 3. Create credential via WebAuthn API
+      // Always use window.location.hostname as rpId — the browser enforces this must match the page origin.
+      const rpId = window.location.hostname;
       const credential = await navigator.credentials.create({
         publicKey: {
           challenge,
-          rp: options.rp,
+          rp: { id: rpId, name: options.rp?.name || 'CardVault' },
           user: { ...options.user, id: userId },
           pubKeyCredParams: options.pubKeyCredParams,
           authenticatorSelection: options.authenticatorSelection,
@@ -113,15 +115,16 @@ export const authAPI = {
   },
 
   loginBiometric: async (email: string): Promise<AuthTokens> => {
-    // 1. Get login options
-    const optRes = await api.post('/auth/webauthn/login/options', { email });
+    // 1. Get login options — send rp_id so backend uses the correct domain
+    const optRes = await api.post('/auth/webauthn/login/options', { email, rp_id: window.location.hostname });
     const options = optRes.data;
 
     // 2. Get assertion from authenticator
+    // Always use window.location.hostname — must match what was used during registration.
     const assertion = await navigator.credentials.get({
       publicKey: {
         challenge: _b64urlToBuffer(options.challenge),
-        rpId: options.rpId,
+        rpId: window.location.hostname,
         allowCredentials: (options.allowCredentials || []).map((c: { id: string; type: string }) => ({
           ...c,
           id: _b64urlToBuffer(c.id),
