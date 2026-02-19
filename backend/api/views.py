@@ -1584,3 +1584,75 @@ def webauthn_delete_credential(request, pk):
         return Response({'detail': 'Credential deleted.'}, status=status.HTTP_200_OK)
     except WebAuthnCredential.DoesNotExist:
         return Response({'detail': 'Credential not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# ─────────────────────────────────────────────────────────────
+# OpenAI Realtime – ephemeral session token endpoint
+# ─────────────────────────────────────────────────────────────
+
+REALTIME_PROMPT_ID = 'pmpt_6996b9cb872c8196810d3e5e95cc6f8707b3ba4bb4cb1fac'
+REALTIME_MODEL = 'gpt-4o-realtime-preview-2024-12-17'
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def realtime_session(request):
+    """
+    Create an ephemeral OpenAI Realtime session token.
+    The API key stays on the server; the browser only receives the short-lived client_secret.
+    """
+    import urllib.request
+    import urllib.error
+
+    openai_key = getattr(django_settings, 'OPENAI_API_KEY', '')
+    if not openai_key:
+        return Response(
+            {'error': 'OpenAI Realtime not configured. Add OPENAI_API_KEY to environment.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    # Build session payload – prompt_id brings the stored system instructions + voice (Marin)
+    payload = {
+        'model': REALTIME_MODEL,
+        'prompt_id': REALTIME_PROMPT_ID,
+        # Low max_tokens keeps responses fast and concise
+        'max_response_output_tokens': 768,
+        # VAD settings: tighter silence detection = faster turn-taking
+        'turn_detection': {
+            'type': 'server_vad',
+            'silence_duration_ms': 600,
+            'prefix_padding_ms': 200,
+            'threshold': 0.5,
+        },
+        'input_audio_transcription': {
+            'model': 'gpt-4o-mini-transcribe',
+        },
+    }
+
+    try:
+        req = urllib.request.Request(
+            'https://api.openai.com/v1/realtime/sessions',
+            data=json.dumps(payload).encode('utf-8'),
+            headers={
+                'Authorization': f'Bearer {openai_key}',
+                'Content-Type': 'application/json',
+            },
+            method='POST',
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+
+        return Response({
+            'client_secret': data['client_secret']['value'],
+            'expires_at': data['client_secret'].get('expires_at'),
+            'model': REALTIME_MODEL,
+        })
+
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode('utf-8', errors='replace')
+        return Response(
+            {'error': f'OpenAI error {e.code}', 'detail': detail},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

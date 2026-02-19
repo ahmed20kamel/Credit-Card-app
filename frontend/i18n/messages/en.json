@@ -426,6 +426,15 @@
     "voiceInput": "Voice input",
     "stopRecording": "Stop recording",
     "attachImage": "Attach image",
-    "imageAttached": "Image attached"
+    "imageAttached": "Image attached",
+    "voiceMode": "Voice Mode",
+    "enableVoiceMode": "Enable voice mode",
+    "disableVoiceMode": "Disable voice mode",
+    "listening": "Listening...",
+    "speaking": "Speaking...",
+    "tapToSpeak": "Tap to speak",
+    "tapToStop": "Tap to stop",
+    "readAloud": "Read aloud",
+    "stopSpeaking": "Stop speaking"
   }
 }

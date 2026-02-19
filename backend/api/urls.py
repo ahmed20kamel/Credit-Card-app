@@ -7,6 +7,7 @@ from .views import (
     webauthn_register_options, webauthn_register_verify,
     webauthn_login_options, webauthn_login_verify,
     webauthn_list_credentials, webauthn_delete_credential,
+    realtime_session,
 )
 
 router = DefaultRouter()
@@ -36,5 +37,6 @@ urlpatterns = [
     path('auth/webauthn/login/verify/', webauthn_login_verify, name='webauthn-login-verify'),
     path('auth/webauthn/credentials/', webauthn_list_credentials, name='webauthn-credentials'),
     path('auth/webauthn/credentials/<int:pk>/', webauthn_delete_credential, name='webauthn-delete-credential'),
+    path('realtime/session/', realtime_session, name='realtime-session'),
     path('', include(router.urls)),
 ]

@@ -3,31 +3,50 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useChatStore } from '@/app/store/chatStore';
 import { useTranslations } from '@/lib/i18n';
-import { MessageCircle, X, Send, Plus, Bot, User as UserIcon, Clock, Trash2, Loader2, Mic, MicOff, Paperclip } from 'lucide-react';
+import {
+  MessageCircle, X, Send, Plus, Bot, User as UserIcon, Clock, Trash2,
+  Loader2, Mic, MicOff, Paperclip, Volume2, VolumeX,
+} from 'lucide-react';
 
 export default function ChatPanel() {
   const { t, locale, isRTL } = useTranslations();
-  const { isOpen, messages, sessions, isSending, isLoading, currentSessionId,
-    toggleChat, closeChat, sendMessage, startNewSession, loadSessions, loadMessages, deleteSession } = useChatStore();
+  const {
+    isOpen, messages, sessions, isSending, isLoading, currentSessionId,
+    toggleChat, closeChat, sendMessage, startNewSession, loadSessions, loadMessages, deleteSession,
+  } = useChatStore();
+
   const [input, setInput] = useState('');
   const [showSessions, setShowSessions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Voice input state
+  // Voice input (STT)
   const [isRecording, setIsRecording] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
 
-  // Image attachment state
+  // Voice output (TTS)
+  const [ttsSupported, setTtsSupported] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Voice Mode: full conversation — auto-sends after STT, auto-speaks AI reply
+  const [voiceMode, setVoiceMode] = useState(false);
+  const lastSpokenMsgCount = useRef(0);
+
+  // Image attachment
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check for Speech Recognition support on mount
+  // ── Init ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    if (SpeechRecognition) {
-      setSpeechSupported(true);
+    const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (SR) setSpeechSupported(true);
+    if ('speechSynthesis' in window) {
+      setTtsSupported(true);
+      // Pre-load voices list (needed on some browsers)
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
     }
   }, []);
 
@@ -39,107 +58,213 @@ export default function ChatPanel() {
     if (isOpen) { inputRef.current?.focus(); loadSessions(); }
   }, [isOpen, loadSessions]);
 
-  // Cleanup recognition on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
-        recognitionRef.current = null;
-      }
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+      window.speechSynthesis?.cancel();
     };
   }, []);
 
+  // ── TTS ───────────────────────────────────────────────────────────────
+  const speak = useCallback((text: string) => {
+    if (!ttsSupported || !text) return;
+    window.speechSynthesis.cancel();
+
+    // Strip markdown formatting for cleaner speech
+    const clean = text
+      .replace(/\*\*/g, '').replace(/\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/`/g, '').replace(/>\s/g, '')
+      .trim();
+
+    if (!clean) return;
+
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.lang = locale === 'ar' ? 'ar-SA' : 'en-US';
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
+
+    // Pick best matching voice
+    const voices = window.speechSynthesis.getVoices();
+    const langPrefix = locale === 'ar' ? 'ar' : 'en';
+    const preferred = voices.find(v => v.lang.startsWith(langPrefix));
+    if (preferred) utterance.voice = preferred;
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend   = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  }, [locale, ttsSupported]);
+
+  const stopSpeaking = useCallback(() => {
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
+  }, []);
+
+  // Auto-speak new AI messages when Voice Mode is active
+  useEffect(() => {
+    if (!voiceMode || isSending) return;
+    if (messages.length > lastSpokenMsgCount.current) {
+      const last = messages[messages.length - 1];
+      if (last?.role === 'assistant') {
+        speak(last.content);
+        lastSpokenMsgCount.current = messages.length;
+      }
+    }
+  }, [messages, isSending, voiceMode, speak]);
+
+  // ── Voice Mode Toggle ─────────────────────────────────────────────────
+  const toggleVoiceMode = useCallback(() => {
+    setVoiceMode(prev => {
+      const next = !prev;
+      if (!next) {
+        stopSpeaking();
+        recognitionRef.current?.abort();
+        recognitionRef.current = null;
+        setIsRecording(false);
+        setInterimTranscript('');
+      } else {
+        // Don't re-speak messages that exist before voice mode was enabled
+        lastSpokenMsgCount.current = messages.length;
+      }
+      return next;
+    });
+  }, [messages.length, stopSpeaking]);
+
+  // ── STT ───────────────────────────────────────────────────────────────
   const toggleRecording = useCallback(() => {
     if (isRecording) {
-      // Stop recording
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-        recognitionRef.current = null;
-      }
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
       setIsRecording(false);
+      setInterimTranscript('');
       return;
     }
 
-    // Start recording
-    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    if (!SpeechRecognition) return;
+    const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SR) return;
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = locale === 'ar' ? 'ar-AE' : 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.continuous = false;
+    const rec = new SR();
+    rec.lang = locale === 'ar' ? 'ar-SA' : 'en-US';
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    rec.continuous = false;
 
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setInput((prev) => prev ? prev + ' ' + transcript : transcript);
-      setIsRecording(false);
-      recognitionRef.current = null;
-      inputRef.current?.focus();
+    let finalText = '';
+
+    rec.onresult = (event: any) => {
+      let interim = '';
+      let final = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) final += t;
+        else interim += t;
+      }
+      if (interim) setInterimTranscript(interim);
+      if (final) {
+        finalText = final;
+        setInterimTranscript('');
+      }
     };
 
-    recognition.onerror = () => {
+    rec.onerror = () => {
       setIsRecording(false);
+      setInterimTranscript('');
       recognitionRef.current = null;
     };
 
-    recognition.onend = () => {
+    rec.onend = () => {
       setIsRecording(false);
+      setInterimTranscript('');
       recognitionRef.current = null;
+      if (finalText) {
+        if (voiceMode) {
+          // Auto-send in voice mode
+          sendMessage(finalText);
+        } else {
+          setInput(prev => prev ? prev + ' ' + finalText : finalText);
+          inputRef.current?.focus();
+        }
+        finalText = '';
+      }
     };
 
-    recognitionRef.current = recognition;
-    recognition.start();
+    // Stop TTS before speaking
+    stopSpeaking();
+
+    recognitionRef.current = rec;
+    rec.start();
     setIsRecording(true);
-  }, [isRecording, locale]);
+  }, [isRecording, locale, voiceMode, sendMessage, stopSpeaking]);
 
-  const handleImageSelect = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
+  // ── Image Attachment ──────────────────────────────────────────────────
+  const handleImageSelect = useCallback(() => fileInputRef.current?.click(), []);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
-
     const reader = new FileReader();
-    reader.onload = () => {
-      setImagePreview(reader.result as string);
-    };
+    reader.onload = () => setImagePreview(reader.result as string);
     reader.readAsDataURL(file);
-
-    // Reset file input so the same file can be selected again
     e.target.value = '';
   }, []);
 
-  const removeImagePreview = useCallback(() => {
-    setImagePreview(null);
-  }, []);
+  const removeImagePreview = useCallback(() => setImagePreview(null), []);
 
+  // ── Send ──────────────────────────────────────────────────────────────
   const handleSend = () => {
     if ((!input.trim() && !imagePreview) || isSending) return;
-    const messageText = input.trim() || (imagePreview ? (t('chat.imageAttached') || 'Image attached') : '');
-    sendMessage(messageText, imagePreview || undefined);
+    const text = input.trim() || (imagePreview ? (t('chat.imageAttached') || 'Image attached') : '');
+    sendMessage(text, imagePreview || undefined);
     setInput('');
     setImagePreview(null);
   };
 
+  // ── Helpers ───────────────────────────────────────────────────────────
+  const ar = (arText: string, enText: string) => locale === 'ar' ? arText : enText;
+
+  // ── Render ────────────────────────────────────────────────────────────
   return (
     <>
-      {/* FAB Button */}
-      <button className="chat-fab" onClick={toggleChat} type="button" aria-label="Chat">
+      {/* FAB */}
+      <button
+        className={`chat-fab ${voiceMode ? 'voice-mode-active' : ''}`}
+        onClick={toggleChat}
+        type="button"
+        aria-label="Chat"
+      >
         {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
       </button>
 
-      {/* Chat Panel */}
       {isOpen && (
         <div className="chat-panel">
-          {/* Header */}
-          <div className="chat-header">
+
+          {/* ── Header ── */}
+          <div className={`chat-header ${voiceMode ? 'voice-mode-header' : ''}`}>
             <div className="chat-header-title">
               <Bot size={20} />
               <span>{t('chat.title') || 'AI Assistant'}</span>
+              {voiceMode && (
+                <span className="chat-voice-badge">
+                  {ar('صوتي', 'Voice')}
+                </span>
+              )}
             </div>
             <div className="chat-header-actions">
+              {ttsSupported && speechSupported && (
+                <button
+                  onClick={toggleVoiceMode}
+                  className={`chat-header-btn ${voiceMode ? 'voice-on' : ''}`}
+                  type="button"
+                  title={voiceMode ? ar('إيقاف الوضع الصوتي', 'Disable voice mode') : ar('تفعيل الوضع الصوتي', 'Enable voice mode')}
+                >
+                  {voiceMode ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                </button>
+              )}
               <button onClick={() => setShowSessions(!showSessions)} className="chat-header-btn" type="button">
                 <Clock size={18} />
               </button>
@@ -152,14 +277,51 @@ export default function ChatPanel() {
             </div>
           </div>
 
-          {/* Sessions sidebar */}
+          {/* ── Voice Status Bar ── */}
+          {voiceMode && (
+            <div className="chat-voice-status-bar">
+              {isRecording ? (
+                <>
+                  <span className="chat-voice-indicator recording" />
+                  <span>{ar('جاري الاستماع...', 'Listening...')}</span>
+                </>
+              ) : isSpeaking ? (
+                <>
+                  <span className="chat-voice-indicator speaking" />
+                  <span>{ar('جاري الكلام...', 'Speaking...')}</span>
+                  <button className="chat-voice-stop-speaking" onClick={stopSpeaking} type="button">
+                    <VolumeX size={11} />
+                    <span>{ar('إيقاف', 'Stop')}</span>
+                  </button>
+                </>
+              ) : isSending ? (
+                <>
+                  <Loader2 size={11} className="chat-voice-spin" />
+                  <span>{ar('جاري التفكير...', 'Thinking...')}</span>
+                </>
+              ) : (
+                <>
+                  <span className="chat-voice-indicator idle" />
+                  <span>{ar('اضغط المايك للكلام', 'Tap mic to speak')}</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── Sessions Sidebar ── */}
           {showSessions && (
             <div className="chat-sessions">
               <div className="chat-sessions-title">{t('chat.sessions') || 'Previous Chats'}</div>
-              {sessions.length === 0 && <p className="chat-sessions-empty">No previous chats</p>}
-              {sessions.map((s) => (
+              {sessions.length === 0 && (
+                <p className="chat-sessions-empty">{ar('لا توجد محادثات سابقة', 'No previous chats')}</p>
+              )}
+              {sessions.map(s => (
                 <div key={s.id} className={`chat-session-item ${s.id === currentSessionId ? 'active' : ''}`}>
-                  <button onClick={() => { loadMessages(s.id); setShowSessions(false); }} className="chat-session-btn" type="button">
+                  <button
+                    onClick={() => { loadMessages(s.id); setShowSessions(false); }}
+                    className="chat-session-btn"
+                    type="button"
+                  >
                     {s.title || 'Chat'}
                   </button>
                   <button onClick={() => deleteSession(s.id)} className="chat-session-delete" type="button">
@@ -170,7 +332,7 @@ export default function ChatPanel() {
             </div>
           )}
 
-          {/* Messages */}
+          {/* ── Messages ── */}
           <div className="chat-messages">
             {isLoading ? (
               <div className="chat-loading"><Loader2 size={24} className="scan-spinner" /></div>
@@ -185,10 +347,32 @@ export default function ChatPanel() {
                   <div className="chat-msg-avatar">
                     {msg.role === 'user' ? <UserIcon size={16} /> : <Bot size={16} />}
                   </div>
-                  <div className="chat-msg-bubble">{msg.content}</div>
+                  <div className="chat-msg-bubble">
+                    <span className="chat-msg-text">{msg.content}</span>
+                    {msg.role === 'assistant' && ttsSupported && (
+                      <button
+                        className={`chat-msg-speak-btn ${isSpeaking ? 'speaking' : ''}`}
+                        onClick={() => isSpeaking ? stopSpeaking() : speak(msg.content)}
+                        type="button"
+                        title={isSpeaking ? ar('إيقاف', 'Stop') : ar('قراءة بصوت عالٍ', 'Read aloud')}
+                      >
+                        {isSpeaking ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             )}
+
+            {/* Live interim transcript */}
+            {interimTranscript && (
+              <div className="chat-msg chat-msg-user">
+                <div className="chat-msg-avatar"><UserIcon size={16} /></div>
+                <div className="chat-msg-bubble chat-interim">{interimTranscript}</div>
+              </div>
+            )}
+
+            {/* Thinking indicator */}
             {isSending && (
               <div className="chat-msg chat-msg-assistant">
                 <div className="chat-msg-avatar"><Bot size={16} /></div>
@@ -200,66 +384,88 @@ export default function ChatPanel() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Image preview */}
+          {/* ── Image Preview ── */}
           {imagePreview && (
             <div className="chat-image-preview">
               <img src={imagePreview} alt="Attached" />
-              <button
-                className="chat-image-preview-remove"
-                onClick={removeImagePreview}
-                type="button"
-                aria-label="Remove image"
-              >
+              <button className="chat-image-preview-remove" onClick={removeImagePreview} type="button" aria-label="Remove image">
                 <X size={14} />
               </button>
             </div>
           )}
 
-          {/* Input */}
-          <div className="chat-input-area">
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
-            />
-            <div className="chat-input-extras">
-              <button
-                onClick={handleImageSelect}
-                className="chat-attach-btn"
-                type="button"
-                title={t('chat.attachImage') || 'Attach image'}
-                disabled={isSending}
-              >
-                <Paperclip size={18} />
-              </button>
-              {speechSupported && (
+          {/* ── Input Area ── */}
+          <div className={`chat-input-area ${voiceMode ? 'voice-mode' : ''}`}>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+
+            {voiceMode ? (
+              /* ── Voice Mode: Big centered mic ── */
+              <div className="chat-voice-input-row">
                 <button
                   onClick={toggleRecording}
-                  className={`chat-voice-btn ${isRecording ? 'recording' : ''}`}
+                  className={`chat-voice-mic-big ${isRecording ? 'recording' : ''}`}
                   type="button"
-                  title={isRecording ? (t('chat.stopRecording') || 'Stop recording') : (t('chat.voiceInput') || 'Voice input')}
-                  disabled={isSending}
+                  disabled={isSending || isSpeaking}
+                  title={isRecording ? ar('إيقاف التسجيل', 'Stop recording') : ar('اضغط للكلام', 'Tap to speak')}
                 >
-                  {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+                  {isRecording ? <MicOff size={30} /> : <Mic size={30} />}
                 </button>
-              )}
-            </div>
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder={t('chat.placeholder') || 'Ask about your finances...'}
-              className="chat-input"
-              disabled={isSending}
-            />
-            <button onClick={handleSend} disabled={isSending || (!input.trim() && !imagePreview)} className="chat-send-btn" type="button">
-              <Send size={18} />
-            </button>
+                <span className="chat-voice-hint">
+                  {isRecording
+                    ? ar('اضغط للإيقاف', 'Tap to stop')
+                    : isSpeaking
+                    ? ar('جاري الكلام...', 'Speaking...')
+                    : isSending
+                    ? ar('جاري التفكير...', 'Thinking...')
+                    : ar('اضغط للكلام', 'Tap to speak')}
+                </span>
+              </div>
+            ) : (
+              /* ── Normal Mode: Text input + extras ── */
+              <>
+                <div className="chat-input-extras">
+                  <button
+                    onClick={handleImageSelect}
+                    className="chat-attach-btn"
+                    type="button"
+                    title={t('chat.attachImage') || 'Attach image'}
+                    disabled={isSending}
+                  >
+                    <Paperclip size={18} />
+                  </button>
+                  {speechSupported && (
+                    <button
+                      onClick={toggleRecording}
+                      className={`chat-voice-btn ${isRecording ? 'recording' : ''}`}
+                      type="button"
+                      title={isRecording ? (t('chat.stopRecording') || 'Stop') : (t('chat.voiceInput') || 'Voice')}
+                      disabled={isSending}
+                    >
+                      {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                  placeholder={t('chat.placeholder') || 'Ask about your finances...'}
+                  className="chat-input"
+                  disabled={isSending}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={isSending || (!input.trim() && !imagePreview)}
+                  className="chat-send-btn"
+                  type="button"
+                >
+                  <Send size={18} />
+                </button>
+              </>
+            )}
           </div>
+
         </div>
       )}
     </>

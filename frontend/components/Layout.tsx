@@ -7,6 +7,7 @@ import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 import Breadcrumbs from './Breadcrumbs';
 import ChatPanel from './ChatPanel';
+import RealtimeVoice from './RealtimeVoice';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -32,6 +33,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </main>
       <ChatPanel />
+      <RealtimeVoice />
     </div>
   );
 }

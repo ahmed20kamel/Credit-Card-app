@@ -248,6 +248,7 @@ if not DEBUG and ENCRYPTION_KEY == 'CHANGE-ME-32-byte-key-for-aes256':
 # AI Vision API settings
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 GOOGLE_API_KEY = config('GOOGLE_API_KEY', default='')
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
 
 # WebAuthn RP ID - must match the frontend domain
 # Set WEBAUTHN_RP_ID env var on Render to your frontend domain (e.g. cardvault-frontend-0myv.onrender.com)

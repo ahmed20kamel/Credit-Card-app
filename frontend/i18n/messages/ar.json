@@ -425,6 +425,15 @@
     "voiceInput": "إدخال صوتي",
     "stopRecording": "إيقاف التسجيل",
     "attachImage": "إرفاق صورة",
-    "imageAttached": "صورة مرفقة"
+    "imageAttached": "صورة مرفقة",
+    "voiceMode": "الوضع الصوتي",
+    "enableVoiceMode": "تفعيل الوضع الصوتي",
+    "disableVoiceMode": "إيقاف الوضع الصوتي",
+    "listening": "جاري الاستماع...",
+    "speaking": "جاري الكلام...",
+    "tapToSpeak": "اضغط للكلام",
+    "tapToStop": "اضغط للإيقاف",
+    "readAloud": "قراءة بصوت عالٍ",
+    "stopSpeaking": "إيقاف الكلام"
   }
 }
