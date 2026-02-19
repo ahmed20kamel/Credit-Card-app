@@ -137,6 +137,7 @@
     "availableBalance": "Available",
     "outstanding": "Outstanding",
     "availableCredit": "Available",
+    "noFullNumber": "Full card number not stored",
     "minimumPayment": "Minimum Payment",
     "minimumPaymentPercent": "Minimum Payment %",
     "minimumPaymentHint": "Fixed amount, or use % below",

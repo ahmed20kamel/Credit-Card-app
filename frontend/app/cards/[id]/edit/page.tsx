@@ -63,7 +63,7 @@ export default function EditCardPage() {
         card_number: card.card_number ? card.card_number.replace(/\s/g, '') : '',
         cardholder_name: card.cardholder_name || '',
         expiry_month: card.expiry_month != null ? String(card.expiry_month) : '',
-        expiry_year: card.expiry_year != null ? String(card.expiry_year) : '',
+        expiry_year: card.expiry_year != null ? String(card.expiry_year > 100 ? card.expiry_year % 100 : card.expiry_year).padStart(2, '0') : '',
         cvv: card.cvv || '',
         iban: card.iban || '',
         notes: card.notes || '',
@@ -318,13 +318,18 @@ export default function EditCardPage() {
                         placeholder="MM"
                       />
                       <input
-                        type="number"
+                        type="tel"
+                        inputMode="numeric"
                         name="expiry_year"
-                        min="2024"
-                        max="2099"
+                        min="24"
+                        max="99"
+                        maxLength={2}
                         value={formData.expiry_year}
-                        onChange={handleChange}
-                        placeholder="YYYY"
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, '').slice(0, 2);
+                          setFormData(prev => ({ ...prev, expiry_year: v }));
+                        }}
+                        placeholder="YY"
                       />
                     </div>
                   </div>

@@ -103,11 +103,11 @@ export function CreditCard({
 
     const yy = parseInt(local.expiryYear || '0', 10);
     const now = new Date();
-    const currentYear = now.getFullYear();
+    const currentYY = now.getFullYear() % 100; // 2-digit current year e.g. 26
     const currentMonth = now.getMonth() + 1;
     if (!local.expiryYear) e.expiryYear = 'Year is required';
-    else if (!(yy >= currentYear && yy <= currentYear + 20)) e.expiryYear = 'Invalid year';
-    else if (yy === currentYear && mm && mm < currentMonth) e.expiryYear = 'Card expired';
+    else if (local.expiryYear.length !== 2 || !(yy >= currentYY && yy <= currentYY + 20)) e.expiryYear = 'Invalid year (YY)';
+    else if (yy === currentYY && mm && mm < currentMonth) e.expiryYear = 'Card expired';
 
     const cvv = onlyDigits(local.cvv);
     if (!cvv) e.cvv = 'CVV is required';
@@ -260,10 +260,10 @@ export function CreditCard({
               inputMode="numeric"
               autoComplete="cc-exp-year"
               value={local.expiryYear}
-              onChange={(e) => update({ expiryYear: onlyDigits(e.target.value).slice(0, 4) })}
+              onChange={(e) => update({ expiryYear: onlyDigits(e.target.value).slice(0, 2) })}
               onFocus={() => setFocused('front')}
-              placeholder="YYYY"
-              maxLength={4}
+              placeholder="YY"
+              maxLength={2}
               aria-label="Expiry year"
             />
             {errors.expiryYear && <p className="credit-card-error">{errors.expiryYear}</p>}

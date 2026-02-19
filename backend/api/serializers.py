@@ -60,9 +60,14 @@ class CardSerializer(serializers.ModelSerializer):
         return value
 
     def validate_expiry_year(self, value):
-        if value is not None and not (2020 <= value <= 2100):
-            raise serializers.ValidationError('Invalid year')
-        return value
+        if value is None:
+            return value
+        # Accept 2-digit years (24-99) or 4-digit years (2020-2100)
+        if 20 <= value <= 99:
+            return value  # 2-digit year e.g. 30 → stored as 30
+        if 2020 <= value <= 2100:
+            return value % 100  # normalize 4-digit to 2-digit e.g. 2030 → 30
+        raise serializers.ValidationError('Invalid year (use YY format, e.g. 30)')
 
     def validate_cvv(self, value):
         if value and not re.match(r'^\d{3,4}$', value):
@@ -164,7 +169,16 @@ class CardUpdateSerializer(serializers.ModelSerializer):
             if digits and not (13 <= len(digits) <= 19):
                 raise serializers.ValidationError('Card number must be 13-19 digits')
         return value
-    
+
+    def validate_expiry_year(self, value):
+        if value is None:
+            return value
+        if 20 <= value <= 99:
+            return value
+        if 2020 <= value <= 2100:
+            return value % 100
+        raise serializers.ValidationError('Invalid year (use YY format, e.g. 30)')
+
     def validate_cvv(self, value):
         if value and not re.match(r'^\d{3,4}$', value):
             raise serializers.ValidationError('CVV must be 3-4 digits')

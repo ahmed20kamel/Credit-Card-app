@@ -1199,8 +1199,8 @@ Rules:
                 if card_type not in ('credit', 'debit', 'prepaid'):
                     card_type = 'credit'
 
-                # Encrypt a placeholder card number (just the last 4 digits padded)
-                placeholder_number = '0' * 12 + card_last_four
+                # Encrypt 16 zeros as placeholder — card_last_four already stored separately
+                placeholder_number = '0000000000000000'
                 new_card = Card.objects.create(
                     user=request.user,
                     card_name=card_name,

@@ -164,11 +164,13 @@ export default function CardsPage() {
         return;
       }
     }
-    if (cardNumber) {
+    if (cardNumber && !isPlaceholderNumber(cardNumber)) {
       await navigator.clipboard.writeText(cardNumber);
       setCopiedCardId(card.id);
       toast.success(t('common.copied') || 'Card number copied!');
       setTimeout(() => setCopiedCardId(null), 2000);
+    } else if (isPlaceholderNumber(cardNumber)) {
+      toast.error(t('cards.noFullNumber') || 'Full card number not stored');
     }
   };
 
@@ -229,6 +231,11 @@ export default function CardsPage() {
     const digits = cardNumber.replace(/\s/g, '');
     if (digits.length === 16) return `${digits.slice(0, 4)}  ${digits.slice(4, 8)}  ${digits.slice(8, 12)}  ${digits.slice(12, 16)}`;
     return cardNumber;
+  };
+
+  const isPlaceholderNumber = (number: string) => {
+    const digits = number.replace(/\s/g, '');
+    return /^0+$/.test(digits) || /^0{12}\d{4}$/.test(digits);
   };
 
   const getCardNetwork = (card: Card) => {
@@ -420,7 +427,7 @@ export default function CardsPage() {
                                   <div className="bank-card-name">{card.card_name}</div>
                                   <div className="bank-card-number-row">
                                     <span className="bank-card-digits">
-                                      {isRevealed && card.card_number
+                                      {isRevealed && card.card_number && !isPlaceholderNumber(card.card_number)
                                         ? formatCardNumber(card.card_number)
                                         : `•••• •••• •••• ${card.card_last_four}`}
                                     </span>

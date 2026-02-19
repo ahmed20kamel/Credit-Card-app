@@ -115,6 +115,12 @@ export default function CardDetailPage() {
     return number.replace(/(.{4})/g, '$1  ').trim();
   };
 
+  // Detect chatbot-added cards whose number is a placeholder (all zeros, or zeros + last 4)
+  const isPlaceholderNumber = (number: string) => {
+    const digits = number.replace(/\s/g, '');
+    return /^0+$/.test(digits) || /^0{12}\d{4}$/.test(digits);
+  };
+
   const copyCardNumber = async () => {
     if (!card || !reveal || !card.card_number) {
       // If not revealed, fetch it first
@@ -257,11 +263,11 @@ export default function CardDetailPage() {
 
                   <div className="credit-card-number-wrapper">
                     <div className="credit-card-number">
-                      {reveal && card.card_number
+                      {reveal && card.card_number && !isPlaceholderNumber(card.card_number)
                         ? formatCardNumber(card.card_number)
                         : `****  ****  ****  ${card.card_last_four}`}
                     </div>
-                    {reveal && card.card_number && (
+                    {reveal && card.card_number && !isPlaceholderNumber(card.card_number) && (
                       <button
                         onClick={copyCardNumber}
                         className="credit-card-copy-btn"
@@ -285,7 +291,7 @@ export default function CardDetailPage() {
                       <p className="credit-card-label">{t('cards.expiry')}</p>
                       <p className="credit-card-expiry-value">
                         {reveal && card.expiry_month && card.expiry_year
-                          ? `${String(card.expiry_month).padStart(2, '0')}/${card.expiry_year}`
+                          ? `${String(card.expiry_month).padStart(2, '0')}/${card.expiry_year > 100 ? card.expiry_year % 100 : card.expiry_year}`
                           : '**/**'}
                       </p>
                     </div>

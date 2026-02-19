@@ -137,6 +137,7 @@
     "availableBalance": "المتاح",
     "outstanding": "المستحقات",
     "availableCredit": "المتاح",
+    "noFullNumber": "رقم البطاقة الكامل غير محفوظ",
     "minimumPayment": "الحد الأدنى للدفع",
     "minimumPaymentPercent": "الحد الأدنى للدفع %",
     "minimumPaymentHint": "مبلغ ثابت، أو استخدم النسبة % أدناه",
