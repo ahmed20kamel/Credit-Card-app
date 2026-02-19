@@ -1590,8 +1590,16 @@ def webauthn_delete_credential(request, pk):
 # OpenAI Realtime – ephemeral session token endpoint
 # ─────────────────────────────────────────────────────────────
 
-REALTIME_PROMPT_ID = 'pmpt_6996b9cb872c8196810d3e5e95cc6f8707b3ba4bb4cb1fac'
 REALTIME_MODEL = 'gpt-4o-realtime-preview-2024-12-17'
+
+# System instructions replicated from the stored prompt.
+# Note: 'prompt_id' is NOT a valid field for /v1/realtime/sessions REST API —
+# it is only used in the OpenAI Playground UI. We set instructions + voice here instead.
+REALTIME_INSTRUCTIONS = (
+    "You are a smart financial assistant for CardVault. "
+    "Always respond in the SAME language the user uses — Arabic if they speak Arabic, "
+    "English if they speak English. Keep answers short, clear and helpful."
+)
 
 
 @api_view(['POST'])
@@ -1611,21 +1619,22 @@ def realtime_session(request):
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
-    # Build session payload – prompt_id brings the stored system instructions + voice (Marin)
+    # Valid voices for gpt-4o-realtime: alloy, ash, ballad, coral, echo, sage, shimmer, verse
+    # "Marin" from the Playground maps closest to "verse"
     payload = {
         'model': REALTIME_MODEL,
-        'prompt_id': REALTIME_PROMPT_ID,
-        # Low max_tokens keeps responses fast and concise
+        'modalities': ['audio', 'text'],
+        'voice': 'verse',
+        'instructions': REALTIME_INSTRUCTIONS,
         'max_response_output_tokens': 768,
-        # VAD settings: tighter silence detection = faster turn-taking
+        'input_audio_transcription': {
+            'model': 'gpt-4o-mini-transcribe',
+        },
         'turn_detection': {
             'type': 'server_vad',
             'silence_duration_ms': 600,
             'prefix_padding_ms': 200,
             'threshold': 0.5,
-        },
-        'input_audio_transcription': {
-            'model': 'gpt-4o-mini-transcribe',
         },
     }
 
