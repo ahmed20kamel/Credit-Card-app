@@ -16,7 +16,7 @@ import { getErrorMessage } from '@/lib/errors';
 import { UAE_BANKS } from '@/lib/uae-banks';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import FormattedNumberInput from '@/components/ui/FormattedNumberInput';
-import CreditCard, { type CreditCardValue } from '@/components/ui/CreditCard';
+import { CreditCard, type CreditCardValue } from '@/components/ui/CreditCard';
 
 const isPlaceholderNumber = (n: string) => {
   const d = n.replace(/\s/g, '');
