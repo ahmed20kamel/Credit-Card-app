@@ -4781,6 +4781,23 @@ html[dir="rtl"] .credit-card-form-ltr * {
   font-weight: 600;
 }
 
+.edit-security-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.75rem;
+  color: var(--text-light);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(5, 150, 105, 0.06);
+  border: 1px solid rgba(5, 150, 105, 0.15);
+  border-radius: var(--radius);
+  margin-top: var(--space-4);
+}
+.edit-security-notice svg {
+  color: var(--success);
+  flex-shrink: 0;
+}
+
 @media (max-width: 1024px) {
   .form-layout {
     grid-template-columns: 1fr;
