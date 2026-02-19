@@ -249,6 +249,10 @@ if not DEBUG and ENCRYPTION_KEY == 'CHANGE-ME-32-byte-key-for-aes256':
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 GOOGLE_API_KEY = config('GOOGLE_API_KEY', default='')
 
+# WebAuthn RP ID - must match the frontend domain
+# Set WEBAUTHN_RP_ID env var on Render to your frontend domain (e.g. cardvault-frontend-0myv.onrender.com)
+WEBAUTHN_RP_ID = config('WEBAUTHN_RP_ID', default='localhost')
+
 # Security settings for production
 if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True

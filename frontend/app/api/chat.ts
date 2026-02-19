@@ -14,7 +14,7 @@ export interface ChatSession {
 }
 
 export const chatAPI = {
-  send: async (message: string, sessionId?: string, image?: string): Promise<{ response: string; session_id: string }> => {
+  send: async (message: string, sessionId?: string, image?: string): Promise<{ response: string; session_id: string; actions?: Array<{ type: string; amount?: number; merchant?: string; card_name?: string; bank_name?: string; card_last_four?: string; card_id?: string }> }> => {
     const body: Record<string, unknown> = { message, session_id: sessionId };
     if (image) {
       body.image = image;

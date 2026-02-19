@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { chatAPI, type ChatMessage, type ChatSession } from '../api/chat';
+import toast from 'react-hot-toast';
 
 interface ChatState {
   isOpen: boolean;
@@ -42,6 +43,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         currentSessionId: res.session_id,
         isSending: false,
       }));
+      // Show toast for performed actions
+      if (res.actions && res.actions.length > 0) {
+        res.actions.forEach((action) => {
+          if (action.type === 'transaction_added') {
+            toast.success(`Transaction added: ${action.amount} AED${action.merchant ? ` - ${action.merchant}` : ''}`);
+          } else if (action.type === 'card_added') {
+            toast.success(`Card added: ${action.card_name}${action.card_last_four ? ` (••••${action.card_last_four})` : ''}`);
+          }
+        });
+      }
       // Reload sessions to get the new title
       get().loadSessions();
     } catch {

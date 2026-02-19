@@ -870,10 +870,15 @@ def export_data(request):
 class ChatSessionViewSet(viewsets.ModelViewSet):
     serializer_class = ChatSessionSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
-        return ChatSession.objects.filter(user=self.request.user)
-    
+        return ChatSession.objects.filter(user=self.request.user).order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
@@ -986,6 +991,13 @@ def chat_send(request):
     if conversation and conversation[-1]['role'] == 'user' and conversation[-1]['content'] == user_message:
         conversation.pop()
 
+    # Build card ID map for action matching
+    card_id_map = {}
+    for card in user_cards:
+        card_id_map[card.card_name.lower()] = str(card.id)
+        if card.card_last_four:
+            card_id_map[card.card_last_four] = str(card.id)
+
     system_prompt = f"""You are CardVault AI, a smart financial assistant in a personal finance app.
 
 ## User's Cards ({len(cards_context)} cards):
@@ -1003,8 +1015,36 @@ def chat_send(request):
 - Be concise and professional
 - Format amounts clearly (e.g. 1,500.00 AED)
 - Never make up data - only use info provided above
-- If the user sends a bank SMS screenshot or transaction notification image, extract the transaction details (amount, merchant, date, type) and help them understand or categorize it.
-- Today: {timezone.now().strftime('%Y-%m-%d')}"""
+- Today: {timezone.now().strftime('%Y-%m-%d')}
+
+## ACTIONS - You can perform real actions!
+You can perform the following actions. Include the action block at the END of your response (after your human-readable message).
+
+### ADD TRANSACTION
+When the user asks to add/record a transaction, or sends a bank SMS/screenshot:
+[ACTION:ADD_TRANSACTION]
+{{"amount": 150.00, "merchant_name": "Carrefour", "transaction_type": "purchase", "transaction_date": "{timezone.now().strftime('%Y-%m-%d')}", "card_last_four": "4311", "currency": "AED", "category": "Shopping", "description": "Carrefour purchase"}}
+[/ACTION]
+- transaction_type: purchase, withdrawal, payment, refund, transfer, deposit
+- card_last_four: match from user's cards, or omit if cash
+- transaction_date: YYYY-MM-DD (today if not specified)
+- category: Shopping, Food, Transport, Bills, Entertainment, Transfer, ATM, Other
+
+### ADD CARD
+When the user asks to add/save a new card:
+[ACTION:ADD_CARD]
+{{"card_name": "Visa Platinum", "bank_name": "Emirates NBD", "card_type": "credit", "card_network": "visa", "card_last_four": "1234", "credit_limit": 50000, "current_balance": 0, "payment_due_date": 25, "balance_currency": "AED"}}
+[/ACTION]
+- card_type: credit, debit, prepaid
+- card_network: visa, mastercard, amex, or omit if unknown
+- payment_due_date: day of month (1-31), or omit if unknown
+- credit_limit and current_balance: numbers, omit if debit/prepaid
+
+Rules:
+- You CAN and SHOULD perform these actions when asked
+- Always confirm what you did in your message text above the action block
+- NEVER say you can't add transactions or cards - you CAN using the action blocks above
+- You can include multiple action blocks in one response if needed"""
 
     ai_response = None
     google_key = getattr(django_settings, 'GOOGLE_API_KEY', '')
@@ -1094,10 +1134,107 @@ def chat_send(request):
     if not ai_response:
         ai_response = "I'm sorry, I couldn't process your request right now. Please try again."
 
-    # Save AI response
-    ChatMessage.objects.create(session=session, role='assistant', content=ai_response)
+    # Process actions from AI response
+    import re
+    from decimal import Decimal
+    actions_performed = []
+    display_response = ai_response
 
-    return Response({'response': ai_response, 'session_id': str(session.id)})
+    # Process ADD_TRANSACTION actions
+    if '[ACTION:ADD_TRANSACTION]' in ai_response:
+        action_pattern = r'\[ACTION:ADD_TRANSACTION\]\s*(\{.*?\})\s*\[/ACTION\]'
+        matches = re.findall(action_pattern, ai_response, re.DOTALL)
+
+        for match in matches:
+            try:
+                txn_data = json.loads(match)
+                amount = txn_data.get('amount')
+                if not amount:
+                    continue
+
+                # Find the card
+                card_obj = None
+                card_last_four = txn_data.get('card_last_four', '')
+                if card_last_four:
+                    card_obj = user_cards.filter(card_last_four=card_last_four).first()
+
+                Transaction.objects.create(
+                    user=request.user,
+                    card=card_obj,
+                    amount=Decimal(str(amount)),
+                    currency=txn_data.get('currency', 'AED'),
+                    transaction_type=txn_data.get('transaction_type', 'purchase'),
+                    merchant_name=txn_data.get('merchant_name', ''),
+                    category=txn_data.get('category', 'Other'),
+                    description=txn_data.get('description', ''),
+                    transaction_date=txn_data.get('transaction_date', timezone.now().strftime('%Y-%m-%d')),
+                )
+
+                # Update card balance if applicable
+                if card_obj and txn_data.get('transaction_type') in ('purchase', 'withdrawal'):
+                    if card_obj.current_balance is not None:
+                        card_obj.current_balance = Decimal(str(float(card_obj.current_balance) + amount))
+                        card_obj.save(update_fields=['current_balance'])
+
+                actions_performed.append({
+                    'type': 'transaction_added',
+                    'amount': amount,
+                    'merchant': txn_data.get('merchant_name', ''),
+                })
+            except (json.JSONDecodeError, Exception) as e:
+                logger.warning('Chat ADD_TRANSACTION error: %s', str(e))
+
+    # Process ADD_CARD actions
+    if '[ACTION:ADD_CARD]' in ai_response:
+        action_pattern = r'\[ACTION:ADD_CARD\]\s*(\{.*?\})\s*\[/ACTION\]'
+        matches = re.findall(action_pattern, ai_response, re.DOTALL)
+
+        for match in matches:
+            try:
+                card_data = json.loads(match)
+                card_name = card_data.get('card_name', '')
+                bank_name = card_data.get('bank_name', '')
+                card_last_four = str(card_data.get('card_last_four', '0000'))[-4:].zfill(4)
+                card_type = card_data.get('card_type', 'credit')
+                if card_type not in ('credit', 'debit', 'prepaid'):
+                    card_type = 'credit'
+
+                # Encrypt a placeholder card number (just the last 4 digits padded)
+                placeholder_number = '0' * 12 + card_last_four
+                new_card = Card.objects.create(
+                    user=request.user,
+                    card_name=card_name,
+                    bank_name=bank_name,
+                    card_type=card_type,
+                    card_network=card_data.get('card_network', ''),
+                    card_number_encrypted=encryption_service.encrypt(placeholder_number),
+                    card_last_four=card_last_four,
+                    balance_currency=card_data.get('balance_currency', 'AED'),
+                    credit_limit=Decimal(str(card_data['credit_limit'])) if card_data.get('credit_limit') else None,
+                    current_balance=Decimal(str(card_data['current_balance'])) if card_data.get('current_balance') is not None else None,
+                    payment_due_date=int(card_data['payment_due_date']) if card_data.get('payment_due_date') else None,
+                )
+
+                actions_performed.append({
+                    'type': 'card_added',
+                    'card_name': card_name,
+                    'bank_name': bank_name,
+                    'card_last_four': card_last_four,
+                    'card_id': str(new_card.id),
+                })
+            except (json.JSONDecodeError, Exception) as e:
+                logger.warning('Chat ADD_CARD error: %s', str(e))
+
+    # Strip all action blocks from the display response
+    display_response = re.sub(r'\[ACTION:[A-Z_]+\].*?\[/ACTION\]', '', ai_response, flags=re.DOTALL).strip()
+
+    # Save AI response (clean version without action blocks)
+    ChatMessage.objects.create(session=session, role='assistant', content=display_response)
+
+    response_data = {'response': display_response, 'session_id': str(session.id)}
+    if actions_performed:
+        response_data['actions'] = actions_performed
+    return Response(response_data)
 
 
 # ---------------------------------------------------------------------------
@@ -1121,6 +1258,23 @@ def _b64url_decode(s: str) -> bytes:
     return base64.urlsafe_b64decode(s)
 
 
+def _get_rp_id(request):
+    """Get the WebAuthn Relying Party ID.
+    Uses WEBAUTHN_RP_ID setting, or auto-detects from the request Origin header.
+    """
+    configured = getattr(django_settings, 'WEBAUTHN_RP_ID', 'localhost')
+    if configured and configured != 'localhost':
+        return configured
+    # Auto-detect from Origin header
+    origin = request.META.get('HTTP_ORIGIN', '')
+    if origin:
+        from urllib.parse import urlparse
+        parsed = urlparse(origin)
+        if parsed.hostname and parsed.hostname != 'localhost':
+            return parsed.hostname
+    return configured
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def webauthn_register_options(request):
@@ -1136,7 +1290,7 @@ def webauthn_register_options(request):
     cache.set(cache_key, challenge, 300)  # 5 minutes
 
     # Relying party configuration
-    rp_id = getattr(django_settings, 'WEBAUTHN_RP_ID', 'localhost')
+    rp_id = _get_rp_id(request)
     rp_name = 'CardVault'
 
     # Build list of credentials to exclude (user already registered these)
@@ -1272,7 +1426,7 @@ def webauthn_login_options(request):
     cache_key = f'webauthn_login_{email}'
     cache.set(cache_key, challenge, 300)  # 5 minutes
 
-    rp_id = getattr(django_settings, 'WEBAUTHN_RP_ID', 'localhost')
+    rp_id = _get_rp_id(request)
 
     allow_credentials = [
         {
