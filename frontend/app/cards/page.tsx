@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI, Card } from '@/app/api/cards';
@@ -10,7 +10,22 @@ import { useTranslations } from '@/lib/i18n';
 import { formatAmount, formatPercent } from '@/lib/formatNumber';
 import CurrencySymbol from '@/components/ui/CurrencySymbol';
 import toast from 'react-hot-toast';
-import { Plus, CreditCard as CreditCardIcon, CheckSquare, Square, Copy, Check } from 'lucide-react';
+import {
+  Plus,
+  CreditCard as CreditCardIcon,
+  Copy,
+  Check,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Eye,
+  EyeOff,
+  Trash2,
+  ExternalLink,
+  CalendarClock,
+  Wallet,
+} from 'lucide-react';
 import { getCardUrl } from '@/lib/utils';
 import BulkActions from '@/components/BulkActions';
 import LoadingState from '@/components/ui/LoadingState';
@@ -18,10 +33,19 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
+interface BankGroup {
+  bankName: string;
+  cards: Card[];
+  totalLimit: number;
+  totalUsed: number;
+  totalAvailable: number;
+  currency: string;
+}
+
 export default function CardsPage() {
   const router = useRouter();
   const { isAuthenticated, loadUser } = useAuthStore();
-  const { t, isRTL } = useTranslations();
+  const { t } = useTranslations();
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +56,7 @@ export default function CardsPage() {
   const [copiedCardId, setCopiedCardId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, cardId: string | null}>({isOpen: false, cardId: null});
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [collapsedBanks, setCollapsedBanks] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -41,70 +66,87 @@ export default function CardsPage() {
 
   const loadCards = useCallback(async () => {
     if (!isAuthenticated) return;
-
     setLoading(true);
     setError(null);
-
     try {
-      const res = await cardsAPI.list({ bank_name: bankFilter || undefined });
-        setCards(res.items || []);
+      const res = await cardsAPI.list();
+      setCards(res.items || []);
     } catch (err: any) {
-        console.error('Cards API Error:', err);
+      console.error('Cards API Error:', err);
       setError(err?.response?.data?.message || t('errors.generic'));
-        setCards([]);
+      setCards([]);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-  }, [isAuthenticated, bankFilter, t]);
+  }, [isAuthenticated, t]);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadCards();
     }
-  }, [isAuthenticated, bankFilter, loadCards]);
+  }, [isAuthenticated, loadCards]);
 
-  const toggleReveal = async (cardId: string) => {
-    if (revealedCards.has(cardId)) {
-      setRevealedCards(prev => {
-        const next = new Set(prev);
-        next.delete(cardId);
-        return next;
-      });
-      // Update card in list to remove revealed data
-      setCards(prev => prev.map(c => c.id === cardId ? {
-        ...c,
-        card_number: undefined,
-        cardholder_name: undefined,
-        expiry_month: undefined,
-        expiry_year: undefined,
-        cvv: undefined
-      } : c));
-    } else {
-      try {
-        const cardData = await cardsAPI.get(cardId, true);
-        setCards(prev => prev.map(c => c.id === cardId ? {
-          ...c,
-          card_number: cardData.card_number,
-          cardholder_name: cardData.cardholder_name,
-          expiry_month: cardData.expiry_month,
-          expiry_year: cardData.expiry_year,
-          cvv: cardData.cvv
-        } : c));
-        setRevealedCards(prev => new Set(prev).add(cardId));
-      } catch (err) {
-        console.error('Error revealing card:', err);
-        toast.error(t('errors.generic'));
-      }
-    }
+  // Group cards by bank name
+  const bankGroups = useMemo((): BankGroup[] => {
+    const filtered = bankFilter
+      ? cards.filter(c => c.bank_name.toLowerCase().includes(bankFilter.toLowerCase()))
+      : cards;
+
+    const groupMap = new Map<string, Card[]>();
+    filtered.forEach(card => {
+      const bank = card.bank_name || 'Other';
+      if (!groupMap.has(bank)) groupMap.set(bank, []);
+      groupMap.get(bank)!.push(card);
+    });
+
+    return Array.from(groupMap.entries())
+      .map(([bankName, bankCards]) => {
+        let totalLimit = 0;
+        let totalUsed = 0;
+        bankCards.forEach(c => {
+          if (c.card_type === 'credit') {
+            totalLimit += Number(c.credit_limit) || 0;
+            totalUsed += Number(c.current_balance) || 0;
+          }
+        });
+        return {
+          bankName,
+          cards: bankCards,
+          totalLimit,
+          totalUsed,
+          totalAvailable: Math.max(totalLimit - totalUsed, 0),
+          currency: bankCards[0]?.balance_currency || 'AED',
+        };
+      })
+      .sort((a, b) => b.cards.length - a.cards.length);
+  }, [cards, bankFilter]);
+
+  const totalStats = useMemo(() => {
+    let totalCards = 0;
+    let totalLimit = 0;
+    let totalUsed = 0;
+    bankGroups.forEach(g => {
+      totalCards += g.cards.length;
+      totalLimit += g.totalLimit;
+      totalUsed += g.totalUsed;
+    });
+    return { totalCards, totalLimit, totalUsed, totalAvailable: Math.max(totalLimit - totalUsed, 0) };
+  }, [bankGroups]);
+
+  const toggleBank = (bankName: string) => {
+    setCollapsedBanks(prev => {
+      const next = new Set(prev);
+      if (next.has(bankName)) next.delete(bankName);
+      else next.add(bankName);
+      return next;
+    });
   };
 
   const copyCardNumber = async (card: Card) => {
     let cardNumber = '';
-    
     if (revealedCards.has(card.id) && card.card_number) {
       cardNumber = card.card_number.replace(/\s/g, '');
     } else {
-      // If not revealed, fetch it
       try {
         const cardData = await cardsAPI.get(card.id, true);
         cardNumber = cardData.card_number?.replace(/\s/g, '') || '';
@@ -117,13 +159,11 @@ export default function CardsPage() {
           cvv: cardData.cvv
         } : c));
         setRevealedCards(prev => new Set(prev).add(card.id));
-      } catch (err) {
-        console.error('Error fetching card number:', err);
+      } catch {
         toast.error(t('errors.generic'));
         return;
       }
     }
-
     if (cardNumber) {
       await navigator.clipboard.writeText(cardNumber);
       setCopiedCardId(card.id);
@@ -132,9 +172,22 @@ export default function CardsPage() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    setDeleteConfirm({ isOpen: true, cardId: id });
+  const toggleReveal = async (cardId: string) => {
+    if (revealedCards.has(cardId)) {
+      setRevealedCards(prev => { const n = new Set(prev); n.delete(cardId); return n; });
+      setCards(prev => prev.map(c => c.id === cardId ? { ...c, card_number: undefined, cardholder_name: undefined, expiry_month: undefined, expiry_year: undefined, cvv: undefined } : c));
+    } else {
+      try {
+        const cardData = await cardsAPI.get(cardId, true);
+        setCards(prev => prev.map(c => c.id === cardId ? { ...c, card_number: cardData.card_number, cardholder_name: cardData.cardholder_name, expiry_month: cardData.expiry_month, expiry_year: cardData.expiry_year, cvv: cardData.cvv } : c));
+        setRevealedCards(prev => new Set(prev).add(cardId));
+      } catch {
+        toast.error(t('errors.generic'));
+      }
+    }
   };
+
+  const handleDelete = (id: string) => setDeleteConfirm({ isOpen: true, cardId: id });
 
   const confirmDelete = async () => {
     const id = deleteConfirm.cardId;
@@ -142,80 +195,49 @@ export default function CardsPage() {
     setDeleteConfirm({ isOpen: false, cardId: null });
     try {
       await cardsAPI.delete(id);
-      setCards(cards.filter((c) => c.id !== id));
-      setSelectedCards(prev => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      setCards(cards.filter(c => c.id !== id));
+      setSelectedCards(prev => { const n = new Set(prev); n.delete(id); return n; });
       toast.success(t('success.cardDeleted'));
-    } catch (err) {
-      toast.error(t('errors.generic'));
-    }
+    } catch { toast.error(t('errors.generic')); }
   };
 
   const handleToggleSelect = (id: string) => {
     setSelectedCards(prev => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
 
-  const handleSelectAll = () => {
-    setSelectedCards(new Set(cards.map(c => c.id)));
-  };
-
-  const handleDeselectAll = () => {
-    setSelectedCards(new Set());
-  };
-
-  const handleDeleteSelected = () => {
-    if (selectedCards.size === 0) return;
-    setBulkDeleteConfirm(true);
-  };
+  const handleSelectAll = () => setSelectedCards(new Set(cards.map(c => c.id)));
+  const handleDeselectAll = () => setSelectedCards(new Set());
+  const handleDeleteSelected = () => { if (selectedCards.size > 0) setBulkDeleteConfirm(true); };
 
   const confirmBulkDelete = async () => {
     setBulkDeleteConfirm(false);
     setDeleting(true);
     try {
-      const deletePromises = Array.from(selectedCards).map(id => cardsAPI.delete(id));
-      await Promise.all(deletePromises);
-
+      await Promise.all(Array.from(selectedCards).map(id => cardsAPI.delete(id)));
       setCards(cards.filter(c => !selectedCards.has(c.id)));
       setSelectedCards(new Set());
-      toast.success(t('success.cardsDeleted', { count: selectedCards.size }) ||
-        `${selectedCards.size} card(s) deleted successfully`);
-    } catch (err) {
-      toast.error(t('errors.generic'));
-    } finally {
-      setDeleting(false);
-    }
+      toast.success(t('success.cardsDeleted', { count: selectedCards.size }) || `${selectedCards.size} card(s) deleted`);
+    } catch { toast.error(t('errors.generic')); }
+    finally { setDeleting(false); }
   };
 
   const formatCardNumber = (cardNumber: string) => {
-    // Remove spaces and format as 4-4-4-4
     const digits = cardNumber.replace(/\s/g, '');
-    if (digits.length === 16) {
-      return `${digits.slice(0, 4)}  ${digits.slice(4, 8)}  ${digits.slice(8, 12)}  ${digits.slice(12, 16)}`;
-    }
+    if (digits.length === 16) return `${digits.slice(0, 4)}  ${digits.slice(4, 8)}  ${digits.slice(8, 12)}  ${digits.slice(12, 16)}`;
     return cardNumber;
   };
 
-  const formatCardNumberDisplay = (card: Card) => {
-    if (revealedCards.has(card.id) && card.card_number) {
-      return formatCardNumber(card.card_number);
-    }
-    // Show last 4 digits only
-    return `****  ****  ****  ${card.card_last_four}`;
-  };
-
-  const getCardColor = () => {
-    return 'off-white';
+  const getCardNetwork = (card: Card) => {
+    if (!card.card_network) return null;
+    const n = card.card_network.toLowerCase();
+    if (n.includes('visa')) return 'visa';
+    if (n.includes('master')) return 'mastercard';
+    if (n.includes('amex')) return 'amex';
+    return null;
   };
 
   if (!isAuthenticated) return null;
@@ -229,16 +251,50 @@ export default function CardsPage() {
             <div className="page-header-icon">
               <CreditCardIcon size={32} />
             </div>
-            <div>
+            <div className="page-header-text">
               <h1>{t('cards.title') || 'My Cards'}</h1>
               <p className="page-subtitle">{t('cards.subtitle') || 'Manage all your credit and debit cards'}</p>
             </div>
           </div>
         </div>
 
+        {/* Stats Summary Bar */}
+        {!loading && cards.length > 0 && (
+          <div className="cards-stats-bar">
+            <div className="cards-stat-item">
+              <span className="cards-stat-value">{totalStats.totalCards}</span>
+              <span className="cards-stat-label">{t('cards.totalCards') || 'Cards'}</span>
+            </div>
+            <div className="cards-stat-divider" />
+            <div className="cards-stat-item">
+              <span className="cards-stat-value">{bankGroups.length}</span>
+              <span className="cards-stat-label">{t('cards.banks') || 'Banks'}</span>
+            </div>
+            {totalStats.totalLimit > 0 && (
+              <>
+                <div className="cards-stat-divider" />
+                <div className="cards-stat-item">
+                  <span className="cards-stat-value cards-stat-available">
+                    {formatAmount(totalStats.totalAvailable)} <CurrencySymbol code="AED" size={14} />
+                  </span>
+                  <span className="cards-stat-label">{t('cards.totalAvailable') || 'Total Available'}</span>
+                </div>
+                <div className="cards-stat-divider" />
+                <div className="cards-stat-item">
+                  <span className="cards-stat-value cards-stat-used">
+                    {formatAmount(totalStats.totalUsed)} <CurrencySymbol code="AED" size={14} />
+                  </span>
+                  <span className="cards-stat-label">{t('cards.totalUsed') || 'Total Used'}</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Search and Actions */}
         <div className="cards-actions-bar">
           <div className="search-container">
+            <Search size={16} className="search-icon-inner" />
             <input
               type="text"
               placeholder={t('cards.filterByBank') || 'Filter by bank name...'}
@@ -253,7 +309,7 @@ export default function CardsPage() {
           </Link>
         </div>
 
-        {/* Bulk Actions Bar */}
+        {/* Bulk Actions */}
         {selectedCards.size > 0 && (
           <BulkActions
             selectedItems={selectedCards}
@@ -266,198 +322,190 @@ export default function CardsPage() {
           />
         )}
 
-        {/* Cards Grid */}
+        {/* Content */}
         {loading ? (
-          <div className="card">
-            <LoadingState />
-          </div>
+          <div className="card"><LoadingState /></div>
         ) : error ? (
-          <div className="card">
-            <ErrorState 
-              message={error}
-              onRetry={loadCards}
-            />
-          </div>
+          <div className="card"><ErrorState message={error} onRetry={loadCards} /></div>
         ) : cards.length === 0 ? (
           <div className="card">
             <EmptyState
               icon={CreditCardIcon}
               title={t('cards.noCards') || 'No Cards Found'}
               description={t('cards.noCardsDescription') || 'Start by adding your first card to manage your finances'}
-              action={{
-                label: t('cards.addCardLink') || 'Add Your First Card',
-                onClick: () => router.push('/cards/new')
-              }}
+              action={{ label: t('cards.addCardLink') || 'Add Your First Card', onClick: () => router.push('/cards/new') }}
             />
           </div>
+        ) : bankGroups.length === 0 ? (
+          <div className="card" style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
+            <Search size={48} style={{ color: 'var(--text-light)', margin: '0 auto 1rem' }} />
+            <p className="text-secondary">{t('cards.noMatchingCards') || 'No cards match your search'}</p>
+          </div>
         ) : (
-          <div className="cards-grid">
-            {cards.map((card, index) => {
-              const usedPercentage = card.credit_limit && card.current_balance 
-                ? (Number(card.current_balance) / Number(card.credit_limit)) * 100 
-                : 0;
-              const cardColor = getCardColor();
-              
-              const getCardNetwork = () => {
-                if (card.card_network) {
-                  const network = card.card_network.toLowerCase();
-                  if (network.includes('visa')) return 'visa';
-                  if (network.includes('master')) return 'mastercard';
-                }
-                return null;
-              };
-
-              const cardNetwork = getCardNetwork();
-
-              const isSelected = selectedCards.has(card.id);
-              
+          <div className="bank-groups-container">
+            {bankGroups.map((group) => {
+              const isCollapsed = collapsedBanks.has(group.bankName);
               return (
-                <div key={card.id} className={`card-item-wrapper ${isSelected ? 'card-item-selected' : ''}`}>
-                  <div className="credit-card-container">
-                    <Link
-                      href={getCardUrl(card.id, card.card_name)}
-                      className={`credit-card ${cardColor}`}
-                >
-                      <div className="credit-card-header">
-                        <div>
-                          {card.is_favorite && <span className="card-favorite">★</span>}
-                          <p className="credit-card-bank">{card.bank_name}</p>
-                          <p className="credit-card-name-text">{card.card_name}</p>
-                        </div>
-                        {cardNetwork && (
-                          <div className="credit-card-vendor-top">
-                            {cardNetwork === 'visa' && (
-                              <div className="card-network-visa">VISA</div>
-                            )}
-                            {cardNetwork === 'mastercard' && (
-                              <div className="card-network-mastercard"></div>
-                            )}
-                          </div>
-                        )}
+                <div key={group.bankName} className="bank-group">
+                  {/* Bank Group Header */}
+                  <button
+                    type="button"
+                    className="bank-group-header"
+                    onClick={() => toggleBank(group.bankName)}
+                  >
+                    <div className="bank-group-left">
+                      <div className="bank-group-icon">
+                        <Building2 size={20} />
                       </div>
-
-                      <div className="credit-card-number-wrapper">
-                        <div className="credit-card-number">
-                          {revealedCards.has(card.id) && card.card_number
-                            ? formatCardNumber(card.card_number)
-                            : `****  ****  ****  ${card.card_last_four}`}
-                        </div>
-                        <button
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            await copyCardNumber(card);
-                          }}
-                          className="credit-card-copy-btn"
-                          title={t('common.copy') || 'Copy card number'}
-                        >
-                          {copiedCardId === card.id ? (
-                            <Check size={14} />
-                          ) : (
-                            <Copy size={14} />
-                          )}
-                        </button>
+                      <div className="bank-group-info">
+                        <h3 className="bank-group-name">{group.bankName}</h3>
+                        <span className="bank-group-count">
+                          {group.cards.length} {group.cards.length === 1 ? (t('cards.card') || 'card') : (t('cards.cardsCount') || 'cards')}
+                        </span>
                       </div>
-
-                      <div className="credit-card-info">
-                        <div>
-                          <p className="credit-card-label">{t('cards.cardholder')}</p>
-                          <p className="credit-card-holder">
-                            {revealedCards.has(card.id) && card.cardholder_name
-                              ? card.cardholder_name
-                              : '••••'}
-                          </p>
-                        </div>
-                        <div className="credit-card-expiry">
-                          <p className="credit-card-label">{t('cards.expiry')}</p>
-                          <p className="credit-card-expiry-value">
-                            {revealedCards.has(card.id) && card.expiry_month && card.expiry_year
-                              ? `${String(card.expiry_month).padStart(2, '0')}/${String(card.expiry_year).slice(-2)}`
-                              : '**/**'}
-                          </p>
                     </div>
-                  </div>
-                      {revealedCards.has(card.id) && card.cvv && (
-                        <div className="credit-card-cvv-section">
-                          <p className="credit-card-label">CVV</p>
-                          <p className="credit-card-cvv-value">{card.cvv}</p>
+                    <div className="bank-group-right">
+                      {group.totalLimit > 0 && (
+                        <div className="bank-group-summary">
+                          <span className="bank-group-available">
+                            {t('cards.available') || 'Available'}: {formatAmount(group.totalAvailable)} <CurrencySymbol code={group.currency} size={12} />
+                          </span>
+                          <span className="bank-group-limit">
+                            / {formatAmount(group.totalLimit)} <CurrencySymbol code={group.currency} size={12} />
+                          </span>
                         </div>
                       )}
-                    </Link>
-                  </div>
-
-                  <div className="card card-compact">
-                    <div className="card-compact-header">
-                      <label className="card-select-label">
-                        <input
-                          type="checkbox"
-                          id={`card-${card.id}`}
-                          checked={isSelected}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            handleToggleSelect(card.id);
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                          className="card-select-checkbox"
-                        />
-                        <span className="card-select-text">{t('common.select')}</span>
-                      </label>
-                    </div>
-                  {card.card_type === 'credit' && card.credit_limit && (
-                    <div className="mb-4">
-                        <div className="flex justify-between card-info-row">
-                          <span className="text-secondary">{t('cards.creditLimit')}:</span>
-                          <span className="card-value">{formatAmount(card.credit_limit)} <CurrencySymbol code={card.balance_currency} size={14} /></span>
+                      <div className="bank-group-chevron">
+                        {isCollapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
                       </div>
-                      {card.current_balance !== null && (
-                        <>
-                            <div className="progress-bar">
-                            <div
-                                className="progress-fill"
-                              style={{ width: `${Math.min(usedPercentage, 100)}%` }}
-                            ></div>
-                          </div>
-                            <div className="flex justify-between card-info-small">
-                              <span>{t('cards.used')}: {formatAmount(card.current_balance)}</span>
-                              <span>{t('cards.available')}: {formatAmount(Number(card.credit_limit) - Number(card.current_balance))}</span>
+                    </div>
+                  </button>
+
+                  {/* Bank Group Cards */}
+                  {!isCollapsed && (
+                    <div className="bank-group-cards">
+                      {group.cards.map((card) => {
+                        const usedPct = card.credit_limit && card.current_balance
+                          ? (Number(card.current_balance) / Number(card.credit_limit)) * 100
+                          : 0;
+                        const availableAmount = card.credit_limit
+                          ? Math.max(Number(card.credit_limit) - Number(card.current_balance || 0), 0)
+                          : null;
+                        const network = getCardNetwork(card);
+                        const isSelected = selectedCards.has(card.id);
+                        const isRevealed = revealedCards.has(card.id);
+
+                        return (
+                          <div key={card.id} className={`bank-card-row ${isSelected ? 'bank-card-selected' : ''}`}>
+                            {/* Selection checkbox */}
+                            <label className="bank-card-checkbox">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleToggleSelect(card.id)}
+                              />
+                            </label>
+
+                            {/* Card main content */}
+                            <Link href={getCardUrl(card.id, card.card_name)} className="bank-card-main">
+                              {/* Card identity */}
+                              <div className="bank-card-identity">
+                                <div className="bank-card-visual">
+                                  {network === 'visa' && <div className="card-network-badge visa">VISA</div>}
+                                  {network === 'mastercard' && <div className="card-network-badge mc">MC</div>}
+                                  {network === 'amex' && <div className="card-network-badge amex">AMEX</div>}
+                                  {!network && <div className="card-network-badge generic"><CreditCardIcon size={16} /></div>}
+                                </div>
+                                <div className="bank-card-details">
+                                  <div className="bank-card-name">{card.card_name}</div>
+                                  <div className="bank-card-number-row">
+                                    <span className="bank-card-digits">
+                                      {isRevealed && card.card_number
+                                        ? formatCardNumber(card.card_number)
+                                        : `•••• •••• •••• ${card.card_last_four}`}
+                                    </span>
+                                    <span className={`bank-card-type-badge ${card.card_type}`}>
+                                      {t(`cards.${card.card_type}`) || card.card_type}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Credit info */}
+                              {card.card_type === 'credit' && card.credit_limit ? (
+                                <div className="bank-card-credit">
+                                  <div className="bank-card-credit-bar">
+                                    <div className="bank-card-credit-track">
+                                      <div
+                                        className={`bank-card-credit-fill ${usedPct > 80 ? 'danger' : usedPct > 50 ? 'warning' : ''}`}
+                                        style={{ width: `${Math.min(usedPct, 100)}%` }}
+                                      />
+                                    </div>
+                                    <span className="bank-card-credit-pct">{Math.round(usedPct)}%</span>
+                                  </div>
+                                  <div className="bank-card-credit-nums">
+                                    <span className="bank-card-available-num">
+                                      <Wallet size={12} />
+                                      {t('cards.available') || 'Available'}: <strong>{formatAmount(availableAmount || 0)}</strong>
+                                    </span>
+                                    <span className="bank-card-limit-num">
+                                      {t('cards.creditLimit') || 'Limit'}: {formatAmount(card.credit_limit)}
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : card.card_type !== 'credit' && card.available_balance != null ? (
+                                <div className="bank-card-credit">
+                                  <div className="bank-card-credit-nums">
+                                    <span className="bank-card-available-num">
+                                      <Wallet size={12} />
+                                      {t('cards.availableBalance') || 'Balance'}: <strong>{formatAmount(card.available_balance)}</strong>
+                                      {' '}<CurrencySymbol code={card.balance_currency} size={12} />
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {/* Due date */}
+                              {card.card_type === 'credit' && card.payment_due_date && (
+                                <div className="bank-card-due">
+                                  <CalendarClock size={13} />
+                                  <span>{t('cards.day') || 'Day'} {card.payment_due_date}</span>
+                                </div>
+                              )}
+                            </Link>
+
+                            {/* Card actions */}
+                            <div className="bank-card-actions">
+                              <button
+                                type="button"
+                                className="bank-card-action-btn"
+                                onClick={() => toggleReveal(card.id)}
+                                title={isRevealed ? (t('cards.hide') || 'Hide') : (t('cards.reveal') || 'Reveal')}
+                              >
+                                {isRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </button>
+                              <button
+                                type="button"
+                                className="bank-card-action-btn"
+                                onClick={() => copyCardNumber(card)}
+                                title={t('common.copy') || 'Copy'}
+                              >
+                                {copiedCardId === card.id ? <Check size={16} /> : <Copy size={16} />}
+                              </button>
+                              <button
+                                type="button"
+                                className="bank-card-action-btn danger"
+                                onClick={() => handleDelete(card.id)}
+                                title={t('common.delete') || 'Delete'}
+                              >
+                                <Trash2 size={16} />
+                              </button>
                             </div>
-                        </>
-                      )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                  
-                  {card.card_type !== 'credit' && card.available_balance !== null && (
-                      <p className="card-balance">
-                        {t('cards.availableBalance')}: <span className="card-value">{formatAmount(card.available_balance)} <CurrencySymbol code={card.balance_currency} size={14} /></span>
-                    </p>
-                  )}
-                  
-                  {card.card_type === 'credit' && card.payment_due_date && (
-                      <div className="card-payment-due">
-                        <span className="card-payment-label">{t('cards.paymentDue')}:</span> {t('cards.day')} {card.payment_due_date}
-                      {card.minimum_payment && (
-                          <span className="card-payment-min">{t('cards.minimumPayment')}: {card.minimum_payment_percentage != null ? <>{formatPercent(card.minimum_payment_percentage)} {t('cards.ofAmountDue')}</> : <>{formatAmount(card.minimum_payment)} <CurrencySymbol code={card.balance_currency} size={12} /></>}</span>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-2">
-                    <Link
-                        href={getCardUrl(card.id, card.card_name)}
-                        className="btn btn-primary btn-flex"
-                    >
-                      {t('cards.viewDetails')}
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(card.id)}
-                        className="btn btn-danger"
-                    >
-                      {t('common.delete')}
-                    </button>
-                    </div>
-                  </div>
                 </div>
               );
             })}
@@ -479,7 +527,7 @@ export default function CardsPage() {
       <ConfirmDialog
         isOpen={bulkDeleteConfirm}
         title={t('cards.deleteCards') || 'Delete Cards'}
-        message={t('cards.deleteMultipleConfirm', { count: selectedCards.size }) || `Are you sure you want to delete ${selectedCards.size} card(s)? This action cannot be undone.`}
+        message={t('cards.deleteMultipleConfirm', { count: selectedCards.size }) || `Are you sure you want to delete ${selectedCards.size} card(s)?`}
         confirmLabel={t('common.delete') || 'Delete'}
         cancelLabel={t('common.cancel') || 'Cancel'}
         variant="danger"

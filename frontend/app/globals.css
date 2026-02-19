@@ -885,103 +885,448 @@ p {
   white-space: nowrap;
 }
 
-.cards-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-5);
-  padding: var(--space-3) 0;
-}
+/* =============================================
+   CARDS PAGE - BANK-GROUPED LAYOUT
+   ============================================= */
 
-/* تحسين شكل الكروت في صفحة Cards - 3 كروت في الصف */
-.cards-page .credit-card-container {
-  max-width: 100%;
-  height: auto;
-  min-height: 280px;
-  margin: 0 auto;
-}
-
-.cards-page .credit-card {
-  overflow: visible;
-}
-
-.cards-page .credit-card-detail {
-  min-height: 280px;
-  height: auto;
-  padding: var(--space-6);
+/* Stats summary bar */
+.cards-stats-bar {
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.cards-page .credit-card-header {
-  margin-bottom: var(--space-4);
-}
-
-.cards-page .credit-card-bank {
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: var(--space-1);
-}
-
-.cards-page .credit-card-name-text {
-  font-size: 1rem;
-  font-weight: 500;
-}
-
-.cards-page .credit-card-number-wrapper {
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   margin-bottom: var(--space-5);
 }
 
-.cards-page .credit-card-number {
-  font-size: 1.25rem;
-  letter-spacing: 0.15em;
-  font-weight: 500;
+.cards-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.cards-page .credit-card-info {
-  margin-bottom: var(--space-4);
+.cards-stat-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
 }
 
-.cards-page .credit-card-holder {
-  font-size: 0.9375rem;
+.cards-stat-value.cards-stat-available {
+  color: #059669;
+}
+
+.cards-stat-value.cards-stat-used {
+  color: var(--danger);
+}
+
+.cards-stat-label {
+  font-size: 0.7rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
 }
 
-.cards-page .credit-card-expiry-value {
-  font-size: 0.9375rem;
-  font-weight: 600;
+.cards-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
 }
 
-.cards-page .credit-card-cvv-section {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+/* Search inner icon */
+.search-container {
+  position: relative;
+}
+
+.search-icon-inner {
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 12px;
+  transform: translateY(-50%);
+  color: var(--text-light);
+  pointer-events: none;
+}
+
+.search-container .search-input-field {
+  padding-inline-start: 36px;
+}
+
+/* Bank groups container */
+.bank-groups-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Bank group card */
+.bank-group {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.bank-group:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Bank group header - clickable */
+.bank-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: start;
+  color: var(--text);
+  transition: background 0.15s ease;
+}
+
+.bank-group-header:hover {
+  background: var(--bg-hover);
+}
+
+.bank-group-left {
   display: flex;
   align-items: center;
   gap: var(--space-3);
 }
 
-.cards-page .credit-card-cvv-section .credit-card-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  opacity: 0.9;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+.bank-group-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark, #5B1E7B));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.cards-page .credit-card-cvv-value {
-  font-size: 1.25rem;
+.bank-group-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.bank-group-name {
+  font-size: 1rem;
   font-weight: 700;
-  padding: var(--space-3) var(--space-5);
-  background: rgba(255, 255, 255, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: var(--radius-lg);
-  min-width: 90px;
-  text-align: center;
-  letter-spacing: 0.25em;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: var(--text);
+  margin: 0;
 }
 
+.bank-group-count {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.bank-group-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.bank-group-summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  text-align: end;
+}
+
+.bank-group-available {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #059669;
+}
+
+.bank-group-limit {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.bank-group-chevron {
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+}
+
+/* Bank group cards list */
+.bank-group-cards {
+  border-top: 1px solid var(--border);
+}
+
+/* Individual card row */
+.bank-card-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.04));
+  transition: background 0.15s ease;
+}
+
+.bank-card-row:last-child {
+  border-bottom: none;
+}
+
+.bank-card-row:hover {
+  background: var(--bg-hover);
+}
+
+.bank-card-row.bank-card-selected {
+  background: rgba(107, 44, 145, 0.04);
+}
+
+/* Checkbox */
+.bank-card-checkbox {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.bank-card-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* Main card content - link */
+.bank-card-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  text-decoration: none;
+  color: var(--text);
+  min-width: 0;
+  padding: var(--space-2) 0;
+}
+
+/* Card identity section */
+.bank-card-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 280px;
+  flex-shrink: 0;
+}
+
+.bank-card-visual {
+  flex-shrink: 0;
+}
+
+.card-network-badge {
+  width: 44px;
+  height: 30px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: white;
+}
+
+.card-network-badge.visa {
+  background: linear-gradient(135deg, #1A1F71, #2E47A7);
+}
+
+.card-network-badge.mc {
+  background: linear-gradient(135deg, #EB001B, #F79E1B);
+}
+
+.card-network-badge.amex {
+  background: linear-gradient(135deg, #006FCF, #00A4E4);
+}
+
+.card-network-badge.generic {
+  background: var(--text-light);
+}
+
+.bank-card-details {
+  min-width: 0;
+}
+
+.bank-card-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.bank-card-number-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bank-card-digits {
+  font-size: 0.8rem;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+}
+
+.bank-card-type-badge {
+  display: inline-flex;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bank-card-type-badge.credit {
+  background: rgba(107, 44, 145, 0.1);
+  color: var(--primary);
+}
+
+.bank-card-type-badge.debit {
+  background: rgba(13, 148, 136, 0.1);
+  color: #0D9488;
+}
+
+.bank-card-type-badge.prepaid {
+  background: rgba(217, 119, 6, 0.1);
+  color: #D97706;
+}
+
+/* Credit info section */
+.bank-card-credit {
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+.bank-card-credit-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: 4px;
+}
+
+.bank-card-credit-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bank-card-credit-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.bank-card-credit-fill.warning {
+  background: #D97706;
+}
+
+.bank-card-credit-fill.danger {
+  background: var(--danger);
+}
+
+.bank-card-credit-pct {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  min-width: 30px;
+  text-align: end;
+}
+
+.bank-card-credit-nums {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.bank-card-available-num {
+  font-size: 0.75rem;
+  color: #059669;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.bank-card-available-num strong {
+  font-weight: 800;
+}
+
+.bank-card-limit-num {
+  font-size: 0.72rem;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+/* Due date badge */
+.bank-card-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: rgba(217, 119, 6, 0.08);
+  color: #B45309;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Card actions */
+.bank-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.bank-card-action-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bank-card-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.bank-card-action-btn.danger:hover {
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--danger);
+}
+
+/* Loading / Empty state cards (kept from before) */
 .loading-card,
 .empty-state-card {
   text-align: center;
@@ -1010,48 +1355,78 @@ p {
   font-size: 0.9375rem;
 }
 
-@media (max-width: 1400px) {
-  .cards-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
+/* Responsive */
 @media (max-width: 1024px) {
-  .cards-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-6);
-  }
-  
   .cards-actions-bar {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .search-container {
     max-width: 100%;
   }
-  
+
   .btn-add-card {
     width: 100%;
     justify-content: center;
   }
+
+  .bank-card-main {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .bank-card-identity {
+    min-width: 200px;
+  }
+
+  .bank-card-credit {
+    min-width: 160px;
+  }
+
+  .cards-stats-bar {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .bank-group-summary {
+    display: none;
+  }
 }
 
 @media (max-width: 768px) {
-  .cards-grid {
-    grid-template-columns: 1fr;
-    gap: var(--space-5);
-  }
-  
-  .cards-page .credit-card-container {
-    height: auto;
-    min-height: 260px;
+  .bank-card-row {
+    flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-2);
   }
 
-  .cards-page .credit-card-detail {
-    min-height: 260px;
-    height: auto;
-    padding: var(--space-5);
+  .bank-card-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .bank-card-identity {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .bank-card-credit {
+    width: 100%;
+    max-width: none;
+  }
+
+  .bank-card-actions {
+    width: 100%;
+    justify-content: flex-end;
+    border-top: 1px solid var(--border-light, rgba(0,0,0,0.04));
+    padding-top: var(--space-2);
+  }
+
+  .cards-stats-bar {
+    overflow-x: auto;
   }
 }
 
@@ -7155,6 +7530,98 @@ html[dir="rtl"] .credit-card-form-ltr * {
   background: var(--primary-dark);
 }
 
+/* Chat Voice & Image Attachment */
+.chat-input-extras {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.chat-voice-btn,
+.chat-attach-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.chat-voice-btn:hover,
+.chat-attach-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--primary);
+  border-color: var(--primary-light);
+}
+
+.chat-voice-btn:disabled,
+.chat-attach-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chat-voice-btn.recording {
+  background: #DC2626;
+  color: white;
+  border-color: #DC2626;
+  animation: chat-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes chat-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+}
+
+.chat-image-preview {
+  position: relative;
+  display: inline-flex;
+  padding: 8px 12px 4px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.chat-image-preview img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.chat-image-preview-remove {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--gray-800);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  transition: background 0.15s;
+}
+
+[dir="rtl"] .chat-image-preview-remove {
+  right: auto;
+  left: 8px;
+}
+
+.chat-image-preview-remove:hover {
+  background: #DC2626;
+}
+
 /* ============================================
    Dashboard Billing Table Styles
    ============================================ */
@@ -7243,6 +7710,11 @@ html[dir="rtl"] .credit-card-form-ltr * {
 .billing-balance {
   font-weight: 600;
   color: var(--danger);
+}
+
+.billing-available {
+  font-weight: 700;
+  color: #059669;
 }
 
 .billing-due-badge {

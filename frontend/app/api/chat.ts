@@ -14,8 +14,12 @@ export interface ChatSession {
 }
 
 export const chatAPI = {
-  send: async (message: string, sessionId?: string): Promise<{ response: string; session_id: string }> => {
-    const res = await api.post('/chat/send', { message, session_id: sessionId });
+  send: async (message: string, sessionId?: string, image?: string): Promise<{ response: string; session_id: string }> => {
+    const body: Record<string, unknown> = { message, session_id: sessionId };
+    if (image) {
+      body.image = image;
+    }
+    const res = await api.post('/chat/send', body);
     return res.data;
   },
   getSessions: async (): Promise<ChatSession[]> => {

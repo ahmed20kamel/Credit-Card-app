@@ -588,11 +588,14 @@ class CardViewSet(viewsets.ModelViewSet):
         items = []
         total_owed = 0
         total_limit = 0
+        total_available = 0
         for card in cards:
             bal = float(card.current_balance) if card.current_balance else 0
             lim = float(card.credit_limit) if card.credit_limit else 0
+            available = max(lim - bal, 0)
             total_owed += bal
             total_limit += lim
+            total_available += available
             min_pay = None
             if card.minimum_payment:
                 min_pay = float(card.minimum_payment)
@@ -602,10 +605,11 @@ class CardViewSet(viewsets.ModelViewSet):
                 'id': str(card.id), 'card_name': card.card_name,
                 'bank_name': card.bank_name, 'card_last_four': card.card_last_four,
                 'credit_limit': lim, 'current_balance': bal,
+                'available_credit': available,
                 'payment_due_date': card.payment_due_date,
                 'minimum_payment': min_pay, 'currency': card.balance_currency,
             })
-        return Response({'items': items, 'total_owed': total_owed, 'total_credit_limit': total_limit, 'currency': 'AED'})
+        return Response({'items': items, 'total_owed': total_owed, 'total_credit_limit': total_limit, 'total_available': total_available, 'currency': 'AED'})
 
 
 class TransactionViewSet(viewsets.ModelViewSet):
@@ -906,9 +910,21 @@ def chat_send(request):
 
     user_message = request.data.get('message', '').strip()
     session_id = request.data.get('session_id')
+    image_data_url = request.data.get('image')  # optional base64 data URL
 
     if not user_message:
         return Response({'error': 'Message is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Parse image data URL if provided (format: data:<mime>;base64,<data>)
+    image_mime = None
+    image_b64 = None
+    if image_data_url and isinstance(image_data_url, str) and image_data_url.startswith('data:'):
+        try:
+            header, image_b64 = image_data_url.split(',', 1)
+            image_mime = header.split(':')[1].split(';')[0]  # e.g. "image/png"
+        except (ValueError, IndexError):
+            image_mime = None
+            image_b64 = None
 
     # Get or create session
     if session_id:
@@ -987,6 +1003,7 @@ def chat_send(request):
 - Be concise and professional
 - Format amounts clearly (e.g. 1,500.00 AED)
 - Never make up data - only use info provided above
+- If the user sends a bank SMS screenshot or transaction notification image, extract the transaction details (amount, merchant, date, type) and help them understand or categorize it.
 - Today: {timezone.now().strftime('%Y-%m-%d')}"""
 
     ai_response = None
@@ -1009,7 +1026,16 @@ def chat_send(request):
                 'role': 'user' if msg['role'] == 'user' else 'model',
                 'parts': [{'text': msg['content']}]
             })
-        gemini_contents.append({'role': 'user', 'parts': [{'text': user_message}]})
+        # Build user message parts (text + optional image)
+        user_parts = [{'text': user_message}]
+        if image_b64 and image_mime:
+            user_parts.append({
+                'inline_data': {
+                    'mime_type': image_mime,
+                    'data': image_b64,
+                }
+            })
+        gemini_contents.append({'role': 'user', 'parts': user_parts})
 
         payload = json.dumps({
             'contents': gemini_contents,
@@ -1044,7 +1070,19 @@ def chat_send(request):
             import anthropic
             client = anthropic.Anthropic(api_key=anthropic_key)
             claude_msgs = [{'role': m['role'], 'content': m['content']} for m in conversation]
-            claude_msgs.append({'role': 'user', 'content': user_message})
+            # Build user content (text + optional image)
+            if image_b64 and image_mime:
+                user_content = [
+                    {'type': 'text', 'text': user_message},
+                    {'type': 'image', 'source': {
+                        'type': 'base64',
+                        'media_type': image_mime,
+                        'data': image_b64,
+                    }},
+                ]
+                claude_msgs.append({'role': 'user', 'content': user_content})
+            else:
+                claude_msgs.append({'role': 'user', 'content': user_message})
             message = client.messages.create(
                 model='claude-sonnet-4-20250514', max_tokens=2048,
                 system=system_prompt, messages=claude_msgs,

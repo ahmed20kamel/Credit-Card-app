@@ -6,7 +6,7 @@ import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Upload, Loader2, Shield, X, CheckCircle, ScanLine } from 'lucide-react';
+import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Upload, Loader2, Shield, X, CheckCircle, ScanLine, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CreditCard, type CreditCardValue } from '@/components/ui/CreditCard';
 import { CameraCardScanner, type ScanResult } from '@/components/ui/CameraCardScanner';
@@ -35,6 +35,7 @@ function NewCardContent() {
     cvv: '',
     cvvLabel: 'CVV',
   });
+  const [benefitInput, setBenefitInput] = useState('');
   const [formData, setFormData] = useState({
     card_name: '',
     bank_name: '',
@@ -51,6 +52,7 @@ function NewCardContent() {
     minimum_payment_percentage: '',
     credit_limit: '',
     current_balance: '',
+    card_benefits: [] as string[],
   });
 
   useEffect(() => {
@@ -162,6 +164,14 @@ function NewCardContent() {
     }
   };
 
+  const addBenefit = () => {
+    const val = benefitInput.trim();
+    if (val && !formData.card_benefits.includes(val)) {
+      setFormData(prev => ({ ...prev, card_benefits: [...prev.card_benefits, val] }));
+      setBenefitInput('');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -189,6 +199,7 @@ function NewCardContent() {
         minimum_payment_percentage: num(formData.minimum_payment_percentage) ?? undefined,
         credit_limit: num(formData.credit_limit) ?? undefined,
         current_balance: num(formData.current_balance) ?? undefined,
+        card_benefits: formData.card_benefits.length > 0 ? JSON.stringify(formData.card_benefits) : undefined,
       };
       await cardsAPI.create(data);
       toast.success(t('success.cardCreated') || 'Card created successfully');
@@ -481,6 +492,42 @@ function NewCardContent() {
                   </div>
                 </div>
               )}
+
+              {/* Benefits */}
+              <div className="form-section">
+                <div className="section-header">
+                  <Star size={20} />
+                  <h3 className="form-section-title">{t('cards.benefits') || 'Card Benefits'}</h3>
+                </div>
+                <p className="form-hint">{t('cards.benefitsHint') || 'Add the perks and features of this card'}</p>
+                <div className="benefits-input-row">
+                  <input
+                    type="text"
+                    value={benefitInput}
+                    onChange={(e) => setBenefitInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBenefit(); } }}
+                    placeholder={t('cards.benefitsPlaceholder') || 'e.g., Airport lounge access'}
+                  />
+                  <button type="button" className="btn btn-secondary" onClick={addBenefit}>
+                    {t('cards.addBenefit') || 'Add'}
+                  </button>
+                </div>
+                {formData.card_benefits.length > 0 && (
+                  <div className="benefits-tags">
+                    {formData.card_benefits.map((b, i) => (
+                      <span key={i} className="benefit-tag">
+                        {b}
+                        <button type="button" onClick={() => setFormData(prev => ({
+                          ...prev,
+                          card_benefits: prev.card_benefits.filter((_, idx) => idx !== i)
+                        }))} className="benefit-tag-remove">
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Notes */}
               <div className="form-section">

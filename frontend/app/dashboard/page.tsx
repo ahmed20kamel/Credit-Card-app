@@ -49,10 +49,11 @@ export default function DashboardPage() {
   const [billing, setBilling] = useState<{
     items: Array<{
       id: string; card_name: string; bank_name: string; card_last_four: string;
-      credit_limit: number; current_balance: number; payment_due_date: number | null;
+      credit_limit: number; current_balance: number; available_credit: number;
+      payment_due_date: number | null;
       minimum_payment: number | null; currency: string;
     }>;
-    total_owed: number; total_credit_limit: number; currency: string;
+    total_owed: number; total_credit_limit: number; total_available: number; currency: string;
   } | null>(null);
 
   useEffect(() => {
@@ -343,6 +344,7 @@ export default function DashboardPage() {
                     <th>{t('cards.bankName') || 'Bank'}</th>
                     <th>{t('cards.creditLimit') || 'Credit Limit'}</th>
                     <th>{t('cards.outstanding') || 'Outstanding'}</th>
+                    <th>{t('cards.availableCredit') || 'Available'}</th>
                     <th>{t('cards.paymentDueDate') || 'Due Date'}</th>
                     <th>{t('cards.minimumPayment') || 'Min Payment'}</th>
                   </tr>
@@ -360,6 +362,9 @@ export default function DashboardPage() {
                       <td>{formatAmount(item.credit_limit)} <CurrencySymbol code={item.currency} size={12} /></td>
                       <td className="billing-balance">
                         {formatAmount(item.current_balance)} <CurrencySymbol code={item.currency} size={12} />
+                      </td>
+                      <td className="billing-available">
+                        {formatAmount(item.available_credit)} <CurrencySymbol code={item.currency} size={12} />
                       </td>
                       <td>
                         {item.payment_due_date ? (
@@ -380,6 +385,9 @@ export default function DashboardPage() {
                     <td colSpan={3} style={{ textAlign: 'end' }}>{t('dashboard.totalOwed') || 'Total Owed'}</td>
                     <td className="billing-balance">
                       {formatAmount(billing.total_owed)} <CurrencySymbol code={billing.currency} size={12} />
+                    </td>
+                    <td className="billing-available">
+                      {formatAmount(billing.total_available)} <CurrencySymbol code={billing.currency} size={12} />
                     </td>
                     <td colSpan={2}>
                       <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>

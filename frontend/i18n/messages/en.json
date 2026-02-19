@@ -105,6 +105,15 @@
     "noCardsDescription": "Start by adding your first card to manage your finances",
     "addCardLink": "Add your first card",
     "filterByBank": "Filter by bank name...",
+    "totalCards": "Cards",
+    "banks": "Banks",
+    "totalAvailable": "Total Available",
+    "totalUsed": "Total Used",
+    "card": "card",
+    "cardsCount": "cards",
+    "noMatchingCards": "No cards match your search",
+    "reveal": "Reveal",
+    "hide": "Hide",
     "cardName": "Card Name",
     "bankName": "Bank Name",
     "cardType": "Type",
@@ -127,6 +136,7 @@
     "currentBalance": "Current Balance",
     "availableBalance": "Available",
     "outstanding": "Outstanding",
+    "availableCredit": "Available",
     "minimumPayment": "Minimum Payment",
     "minimumPaymentPercent": "Minimum Payment %",
     "minimumPaymentHint": "Fixed amount, or use % below",
@@ -400,6 +410,10 @@
     "noMessages": "Hi! I'm your financial assistant. Ask me anything about your cards, balances, or spending.",
     "thinking": "Thinking...",
     "sessions": "Previous Chats",
-    "deleteSession": "Delete Chat"
+    "deleteSession": "Delete Chat",
+    "voiceInput": "Voice input",
+    "stopRecording": "Stop recording",
+    "attachImage": "Attach image",
+    "imageAttached": "Image attached"
   }
 }

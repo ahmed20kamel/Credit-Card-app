@@ -105,6 +105,15 @@
     "noCardsDescription": "ابدأ بإضافة بطاقتك الأولى لإدارة أموالك",
     "addCardLink": "أضف بطاقتك الأولى",
     "filterByBank": "تصفية حسب اسم البنك...",
+    "totalCards": "البطاقات",
+    "banks": "البنوك",
+    "totalAvailable": "إجمالي المتاح",
+    "totalUsed": "إجمالي المستخدم",
+    "card": "بطاقة",
+    "cardsCount": "بطاقات",
+    "noMatchingCards": "لا توجد بطاقات مطابقة للبحث",
+    "reveal": "إظهار",
+    "hide": "إخفاء",
     "cardName": "اسم البطاقة",
     "bankName": "اسم البنك",
     "cardType": "النوع",
@@ -127,6 +136,7 @@
     "currentBalance": "الرصيد الحالي",
     "availableBalance": "المتاح",
     "outstanding": "المستحقات",
+    "availableCredit": "المتاح",
     "minimumPayment": "الحد الأدنى للدفع",
     "minimumPaymentPercent": "الحد الأدنى للدفع %",
     "minimumPaymentHint": "مبلغ ثابت، أو استخدم النسبة % أدناه",
@@ -399,6 +409,10 @@
     "noMessages": "أهلاً! أنا مساعدك المالي. اسألني أي شيء عن بطاقاتك أو أرصدتك أو مصاريفك.",
     "thinking": "جاري التفكير...",
     "sessions": "المحادثات السابقة",
-    "deleteSession": "حذف المحادثة"
+    "deleteSession": "حذف المحادثة",
+    "voiceInput": "إدخال صوتي",
+    "stopRecording": "إيقاف التسجيل",
+    "attachImage": "إرفاق صورة",
+    "imageAttached": "صورة مرفقة"
   }
 }

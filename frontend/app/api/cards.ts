@@ -52,12 +52,14 @@ export const cardsAPI = {
       card_last_four: string;
       credit_limit: number;
       current_balance: number;
+      available_credit: number;
       payment_due_date: number | null;
       minimum_payment: number | null;
       currency: string;
     }>;
     total_owed: number;
     total_credit_limit: number;
+    total_available: number;
     currency: string;
   }> => {
     const response = await api.get('/cards/billing-summary');

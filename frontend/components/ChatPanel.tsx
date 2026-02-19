@@ -1,18 +1,35 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useChatStore } from '@/app/store/chatStore';
 import { useTranslations } from '@/lib/i18n';
-import { MessageCircle, X, Send, Plus, Bot, User as UserIcon, Clock, Trash2, Loader2 } from 'lucide-react';
+import { MessageCircle, X, Send, Plus, Bot, User as UserIcon, Clock, Trash2, Loader2, Mic, MicOff, Paperclip } from 'lucide-react';
 
 export default function ChatPanel() {
-  const { t, isRTL } = useTranslations();
+  const { t, locale, isRTL } = useTranslations();
   const { isOpen, messages, sessions, isSending, isLoading, currentSessionId,
     toggleChat, closeChat, sendMessage, startNewSession, loadSessions, loadMessages, deleteSession } = useChatStore();
   const [input, setInput] = useState('');
   const [showSessions, setShowSessions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Voice input state
+  const [isRecording, setIsRecording] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  // Image attachment state
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check for Speech Recognition support on mount
+  useEffect(() => {
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (SpeechRecognition) {
+      setSpeechSupported(true);
+    }
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -22,10 +39,88 @@ export default function ChatPanel() {
     if (isOpen) { inputRef.current?.focus(); loadSessions(); }
   }, [isOpen, loadSessions]);
 
+  // Cleanup recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
+    };
+  }, []);
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      // Stop recording
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    // Start recording
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = locale === 'ar' ? 'ar-AE' : 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput((prev) => prev ? prev + ' ' + transcript : transcript);
+      setIsRecording(false);
+      recognitionRef.current = null;
+      inputRef.current?.focus();
+    };
+
+    recognition.onerror = () => {
+      setIsRecording(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+  }, [isRecording, locale]);
+
+  const handleImageSelect = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Reset file input so the same file can be selected again
+    e.target.value = '';
+  }, []);
+
+  const removeImagePreview = useCallback(() => {
+    setImagePreview(null);
+  }, []);
+
   const handleSend = () => {
-    if (!input.trim() || isSending) return;
-    sendMessage(input.trim());
+    if ((!input.trim() && !imagePreview) || isSending) return;
+    const messageText = input.trim() || (imagePreview ? (t('chat.imageAttached') || 'Image attached') : '');
+    sendMessage(messageText, imagePreview || undefined);
     setInput('');
+    setImagePreview(null);
   };
 
   return (
@@ -105,8 +200,53 @@ export default function ChatPanel() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Image preview */}
+          {imagePreview && (
+            <div className="chat-image-preview">
+              <img src={imagePreview} alt="Attached" />
+              <button
+                className="chat-image-preview-remove"
+                onClick={removeImagePreview}
+                type="button"
+                aria-label="Remove image"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
           {/* Input */}
           <div className="chat-input-area">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+            />
+            <div className="chat-input-extras">
+              <button
+                onClick={handleImageSelect}
+                className="chat-attach-btn"
+                type="button"
+                title={t('chat.attachImage') || 'Attach image'}
+                disabled={isSending}
+              >
+                <Paperclip size={18} />
+              </button>
+              {speechSupported && (
+                <button
+                  onClick={toggleRecording}
+                  className={`chat-voice-btn ${isRecording ? 'recording' : ''}`}
+                  type="button"
+                  title={isRecording ? (t('chat.stopRecording') || 'Stop recording') : (t('chat.voiceInput') || 'Voice input')}
+                  disabled={isSending}
+                >
+                  {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+                </button>
+              )}
+            </div>
             <input
               ref={inputRef}
               value={input}
@@ -116,7 +256,7 @@ export default function ChatPanel() {
               className="chat-input"
               disabled={isSending}
             />
-            <button onClick={handleSend} disabled={isSending || !input.trim()} className="chat-send-btn" type="button">
+            <button onClick={handleSend} disabled={isSending || (!input.trim() && !imagePreview)} className="chat-send-btn" type="button">
               <Send size={18} />
             </button>
           </div>
