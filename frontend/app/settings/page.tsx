@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
 import { useAuthStore } from '@/app/store/authStore';
 import { authAPI } from '@/app/api/auth';
+import api from '@/app/api/client';
 import { getErrorMessage } from '@/lib/errors';
 import { getTheme, setTheme, type Theme } from '@/lib/theme';
 import toast from 'react-hot-toast';
@@ -23,6 +24,7 @@ import {
   Shield,
   Check,
   Save,
+  Fingerprint,
 } from 'lucide-react';
 import PasswordStrength from '@/components/ui/PasswordStrength';
 
@@ -42,6 +44,10 @@ export default function SettingsPage() {
 
   const [currentTheme, setCurrentTheme] = useState<Theme>('system');
 
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricRegistered, setBiometricRegistered] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+
   useEffect(() => {
     if (!isAuthenticated) {
       loadUser().catch(() => {
@@ -58,6 +64,35 @@ export default function SettingsPage() {
   useEffect(() => {
     setCurrentTheme(getTheme());
   }, []);
+
+  useEffect(() => {
+    authAPI.checkBiometricSupport().then(setBiometricAvailable);
+    // Check if user has registered credentials
+    if (isAuthenticated) {
+      api.get('/auth/webauthn/register/options').then(() => {
+        // If we can get options, the endpoint exists, check localStorage
+        setBiometricRegistered(localStorage.getItem('biometric_registered') === 'true');
+      }).catch(() => {});
+    }
+  }, [isAuthenticated]);
+
+  const handleBiometricRegister = async () => {
+    setBiometricLoading(true);
+    try {
+      const result = await authAPI.registerBiometric();
+      if (result.success) {
+        setBiometricRegistered(true);
+        localStorage.setItem('biometric_registered', 'true');
+        toast.success(t('settings.biometricEnabled') || 'Biometric login enabled!');
+      } else {
+        toast.error(result.error || 'Registration failed');
+      }
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to register biometric'));
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -345,6 +380,41 @@ export default function SettingsPage() {
                 </button>
               </div>
             </div>
+
+            {biometricAvailable && (
+              <div className="card settings-card">
+                <div className="settings-card-header">
+                  <div className="settings-card-icon security">
+                    <Fingerprint size={20} />
+                  </div>
+                  <div>
+                    <h2 className="settings-card-title">{t('settings.biometricSection') || 'Biometric Login'}</h2>
+                    <p className="settings-card-desc">{t('settings.biometricDesc') || 'Use fingerprint or Face ID to sign in'}</p>
+                  </div>
+                </div>
+
+                <div className="settings-biometric-content">
+                  {biometricRegistered ? (
+                    <div className="settings-biometric-status enabled">
+                      <Check size={20} />
+                      <span>{t('settings.biometricEnabled') || 'Biometric login is enabled'}</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleBiometricRegister}
+                      disabled={biometricLoading}
+                      className="btn btn-primary settings-save-btn"
+                    >
+                      <Fingerprint size={16} />
+                      {biometricLoading
+                        ? (t('common.saving') || 'Setting up...')
+                        : (t('settings.enableBiometric') || 'Enable Biometric Login')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

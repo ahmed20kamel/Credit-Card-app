@@ -80,6 +80,7 @@ class Card(models.Model):
     minimum_payment_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text='Min payment as % of amount due (e.g. 5 for 5%), varies by bank')
     credit_limit = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, help_text='Total credit limit')
     current_balance = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, help_text='Current outstanding balance')
+    card_benefits = models.TextField(null=True, blank=True, help_text='JSON array of card benefits/features')
 
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -179,3 +180,21 @@ class ChatMessage(models.Model):
         db_table = 'chat_messages'
         indexes = [models.Index(fields=['session_id'])]
         ordering = ['created_at']
+
+
+class WebAuthnCredential(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='webauthn_credentials')
+    credential_id = models.TextField(unique=True)  # base64url encoded
+    public_key = models.TextField()  # base64url encoded
+    sign_count = models.IntegerField(default=0)
+    device_name = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'webauthn_credentials'
+        indexes = [models.Index(fields=['user_id'])]
+
+    def __str__(self):
+        return f'{self.user.email} - {self.device_name or self.credential_id[:20]}'

@@ -23,7 +23,9 @@ import {
   TrendingDown,
   Receipt,
   Copy,
-  Check
+  Check,
+  Star,
+  CheckCircle
 } from 'lucide-react';
 import { extractCardId, getCardUrl } from '@/lib/utils';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -442,6 +444,24 @@ export default function CardDetailPage() {
                     <span className="sidebar-info-value">{card.minimum_payment_percentage != null ? formatPercent(card.minimum_payment_percentage) : <>{formatAmount(card.minimum_payment)} <CurrencySymbol code={card.balance_currency} size={12} /></>}</span>
                   </div>
                 )}
+                {/* Card Benefits */}
+                {card.card_benefits && (() => {
+                  try {
+                    const benefits: string[] = JSON.parse(card.card_benefits);
+                    if (benefits.length > 0) return (
+                      <div className="card detail-section">
+                        <h3 className="detail-section-title"><Star size={18} /> {t('cards.benefits') || 'Card Benefits'}</h3>
+                        <ul className="benefits-list">
+                          {benefits.map((b, i) => (
+                            <li key={i} className="benefit-item"><CheckCircle size={14} className="benefit-check" /><span>{b}</span></li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  } catch { /* invalid JSON */ }
+                  return null;
+                })()}
+
                 {card.notes && (
                   <div className="sidebar-info-item sidebar-info-item-full">
                     <span className="sidebar-info-label">{t('cards.notes')}</span>

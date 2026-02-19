@@ -62,6 +62,7 @@ export interface Card {
   minimum_payment_percentage?: number | null;
   credit_limit?: number;
   current_balance?: number;
+  card_benefits?: string;
   created_at: string;
   updated_at: string;
   // Revealed fields (only when reveal=true)
@@ -92,6 +93,7 @@ export interface CardCreateRequest {
   minimum_payment_percentage?: number | null;
   credit_limit?: number | null;
   current_balance?: number | null;
+  card_benefits?: string;
 }
 
 export interface CardUpdateRequest {

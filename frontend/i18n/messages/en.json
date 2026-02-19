@@ -92,7 +92,10 @@
     "avgTransaction": "Avg Transaction",
     "largestTransaction": "Largest Transaction",
     "cardsUsed": "Cards Used",
-    "topCategory": "Top Category"
+    "topCategory": "Top Category",
+    "billingOverview": "Billing Overview",
+    "totalOwed": "Total Owed",
+    "totalCreditLimit": "Total Credit Limit"
   },
   "cards": {
     "title": "My Cards",
@@ -187,7 +190,12 @@
     "scanningAuto": "Scanning...",
     "scanRetrying": "Adjusting... Hold card steady",
     "switchCamera": "Flip",
-    "uploadImageHint": "Select a photo of your card from gallery"
+    "uploadImageHint": "Select a photo of your card from gallery",
+    "benefits": "Card Benefits",
+    "benefitsPlaceholder": "e.g., Airport lounge access",
+    "addBenefit": "Add",
+    "noBenefits": "No benefits added",
+    "benefitsHint": "Add the perks and features of this card"
   },
   "transactions": {
     "title": "Transactions",
@@ -383,5 +391,15 @@
     "entryCreated": "Cash entry created successfully",
     "entryDeleted": "Cash entry deleted successfully",
     "deleteConfirm": "Are you sure you want to delete this entry?"
+  },
+  "chat": {
+    "title": "AI Assistant",
+    "placeholder": "Ask about your finances...",
+    "send": "Send",
+    "newChat": "New Chat",
+    "noMessages": "Hi! I'm your financial assistant. Ask me anything about your cards, balances, or spending.",
+    "thinking": "Thinking...",
+    "sessions": "Previous Chats",
+    "deleteSession": "Delete Chat"
   }
 }

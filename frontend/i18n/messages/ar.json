@@ -92,7 +92,10 @@
     "avgTransaction": "متوسط المعاملة",
     "largestTransaction": "أكبر معاملة",
     "cardsUsed": "البطاقات المستخدمة",
-    "topCategory": "أعلى فئة"
+    "topCategory": "أعلى فئة",
+    "billingOverview": "نظرة عامة على الفواتير",
+    "totalOwed": "إجمالي المستحق",
+    "totalCreditLimit": "إجمالي الحد الائتماني"
   },
   "cards": {
     "title": "بطاقاتي",
@@ -187,7 +190,12 @@
     "scanningAuto": "جاري المسح...",
     "scanRetrying": "جاري التعديل... ثبّت البطاقة",
     "switchCamera": "تبديل",
-    "uploadImageHint": "اختر صورة لبطاقتك من المعرض"
+    "uploadImageHint": "اختر صورة لبطاقتك من المعرض",
+    "benefits": "مميزات البطاقة",
+    "benefitsPlaceholder": "مثال: دخول صالة المطار",
+    "addBenefit": "إضافة",
+    "noBenefits": "لا توجد مميزات",
+    "benefitsHint": "أضف المميزات والخصائص لهذه البطاقة"
   },
   "transactions": {
     "title": "المعاملات",
@@ -382,5 +390,15 @@
     "entryCreated": "تم إنشاء المدخل النقدي بنجاح",
     "entryDeleted": "تم حذف المدخل النقدي بنجاح",
     "deleteConfirm": "هل أنت متأكد من حذف هذا المدخل؟"
+  },
+  "chat": {
+    "title": "المساعد الذكي",
+    "placeholder": "اسأل عن أمورك المالية...",
+    "send": "إرسال",
+    "newChat": "محادثة جديدة",
+    "noMessages": "أهلاً! أنا مساعدك المالي. اسألني أي شيء عن بطاقاتك أو أرصدتك أو مصاريفك.",
+    "thinking": "جاري التفكير...",
+    "sessions": "المحادثات السابقة",
+    "deleteSession": "حذف المحادثة"
   }
 }

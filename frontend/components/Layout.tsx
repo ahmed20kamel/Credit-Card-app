@@ -6,6 +6,7 @@ import { useTranslations } from '@/lib/i18n';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 import Breadcrumbs from './Breadcrumbs';
+import ChatPanel from './ChatPanel';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -30,6 +31,7 @@ export default function Layout({ children }: LayoutProps) {
           {children}
         </div>
       </main>
+      <ChatPanel />
     </div>
   );
 }

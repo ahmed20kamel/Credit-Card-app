@@ -3,7 +3,9 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     register, login, refresh_token, profile, change_password, export_data,
     CardViewSet, TransactionViewSet, CashEntryViewSet,
-    ChatSessionViewSet, ChatMessageViewSet
+    ChatSessionViewSet, ChatMessageViewSet, chat_send,
+    webauthn_register_options, webauthn_register_verify,
+    webauthn_login_options, webauthn_login_verify,
 )
 
 router = DefaultRouter()
@@ -26,5 +28,10 @@ urlpatterns = [
     path('auth/me/', profile, name='profile'),
     path('auth/change-password/', change_password, name='change-password'),
     path('export/', export_data, name='export-data'),
+    path('chat/send/', chat_send, name='chat-send'),
+    path('auth/webauthn/register/options/', webauthn_register_options, name='webauthn-register-options'),
+    path('auth/webauthn/register/verify/', webauthn_register_verify, name='webauthn-register-verify'),
+    path('auth/webauthn/login/options/', webauthn_login_options, name='webauthn-login-options'),
+    path('auth/webauthn/login/verify/', webauthn_login_verify, name='webauthn-login-verify'),
     path('', include(router.urls)),
 ]

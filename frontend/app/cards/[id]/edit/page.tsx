@@ -7,7 +7,7 @@ import { cardsAPI, Card } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Save, CreditCard as CreditCardIcon, Building2, Wallet, FileText } from 'lucide-react';
+import { ArrowLeft, Save, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Star, X } from 'lucide-react';
 import { extractCardId } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/errors';
 import { UAE_BANKS } from '@/lib/uae-banks';
@@ -22,6 +22,7 @@ export default function EditCardPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [cardId, setCardId] = useState('');
+  const [benefitInput, setBenefitInput] = useState('');
   const [formData, setFormData] = useState({
     card_name: '',
     bank_name: '',
@@ -42,6 +43,7 @@ export default function EditCardPage() {
     payment_due_date: '',
     minimum_payment: '',
     minimum_payment_percentage: '',
+    card_benefits: [] as string[],
   });
 
   useEffect(() => {
@@ -73,6 +75,7 @@ export default function EditCardPage() {
         payment_due_date: card.payment_due_date != null ? String(card.payment_due_date) : '',
         minimum_payment: card.minimum_payment != null ? String(card.minimum_payment) : '',
         minimum_payment_percentage: card.minimum_payment_percentage != null ? String(card.minimum_payment_percentage) : '',
+        card_benefits: card.card_benefits ? (() => { try { return JSON.parse(card.card_benefits); } catch { return []; } })() : [],
       });
       setLoading(false);
     } catch (err: unknown) {
@@ -97,6 +100,14 @@ export default function EditCardPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const addBenefit = () => {
+    const val = benefitInput.trim();
+    if (val && !formData.card_benefits.includes(val)) {
+      setFormData(prev => ({ ...prev, card_benefits: [...prev.card_benefits, val] }));
+      setBenefitInput('');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -116,6 +127,7 @@ export default function EditCardPage() {
         notes: formData.notes || undefined,
         available_balance: formData.available_balance ? parseFloat(formData.available_balance) : undefined,
         balance_currency: formData.balance_currency || undefined,
+        card_benefits: formData.card_benefits.length > 0 ? JSON.stringify(formData.card_benefits) : undefined,
       };
 
       if (formData.card_type === 'credit') {
@@ -484,6 +496,42 @@ export default function EditCardPage() {
                     placeholder={t('cards.notesPlaceholder') || 'Add any additional notes about this card...'}
                   />
                 </div>
+              </div>
+
+              {/* Benefits */}
+              <div className="form-section">
+                <div className="section-header">
+                  <Star size={20} />
+                  <h3 className="form-section-title">{t('cards.benefits') || 'Card Benefits'}</h3>
+                </div>
+                <p className="form-hint">{t('cards.benefitsHint') || 'Add the perks and features of this card'}</p>
+                <div className="benefits-input-row">
+                  <input
+                    type="text"
+                    value={benefitInput}
+                    onChange={(e) => setBenefitInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBenefit(); } }}
+                    placeholder={t('cards.benefitsPlaceholder') || 'e.g., Airport lounge access'}
+                  />
+                  <button type="button" className="btn btn-secondary" onClick={addBenefit}>
+                    {t('cards.addBenefit') || 'Add'}
+                  </button>
+                </div>
+                {formData.card_benefits.length > 0 && (
+                  <div className="benefits-tags">
+                    {formData.card_benefits.map((b: string, i: number) => (
+                      <span key={i} className="benefit-tag">
+                        {b}
+                        <button type="button" onClick={() => setFormData(prev => ({
+                          ...prev,
+                          card_benefits: prev.card_benefits.filter((_: string, idx: number) => idx !== i)
+                        }))} className="benefit-tag-remove">
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}

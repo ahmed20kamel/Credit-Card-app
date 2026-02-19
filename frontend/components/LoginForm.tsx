@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/app/store/authStore';
 import { useTranslations } from '@/lib/i18n';
 import { getErrorMessage } from '@/lib/errors';
-import { CreditCard, Eye, EyeOff } from 'lucide-react';
+import { authAPI } from '@/app/api/auth';
+import { CreditCard, Eye, EyeOff, Fingerprint } from 'lucide-react';
 
 export default function LoginForm() {
   const router = useRouter();
@@ -16,6 +17,29 @@ export default function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+
+  useEffect(() => {
+    authAPI.checkBiometricSupport().then(setBiometricAvailable);
+  }, []);
+
+  const handleBiometric = async () => {
+    if (!email) {
+      setError(t('auth.enterEmailFirst') || 'Please enter your email first');
+      return;
+    }
+    setBiometricLoading(true);
+    setError('');
+    try {
+      await authAPI.loginBiometric(email);
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('auth.biometricFailed') || 'Biometric login failed'));
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +117,25 @@ export default function LoginForm() {
           <button type="submit" disabled={isLoading} className="btn btn-primary btn-full">
             {isLoading ? (t('auth.signingIn') || 'Signing in...') : (t('auth.signIn') || 'Sign in')}
           </button>
+
+          {biometricAvailable && (
+            <>
+              <div className="biometric-divider">
+                <span>{t('auth.or') || 'or'}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleBiometric}
+                disabled={biometricLoading || isLoading}
+                className="btn btn-biometric btn-full"
+              >
+                <Fingerprint size={20} />
+                {biometricLoading
+                  ? (t('common.loading') || 'Loading...')
+                  : (t('auth.biometricLogin') || 'Sign in with Biometrics')}
+              </button>
+            </>
+          )}
 
           <p className="auth-footer-text">
             {t('auth.noAccount') || "Don't have an account?"}{' '}

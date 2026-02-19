@@ -44,6 +44,26 @@ export const cardsAPI = {
     return response.data;
   },
 
+  billingSummary: async (): Promise<{
+    items: Array<{
+      id: string;
+      card_name: string;
+      bank_name: string;
+      card_last_four: string;
+      credit_limit: number;
+      current_balance: number;
+      payment_due_date: number | null;
+      minimum_payment: number | null;
+      currency: string;
+    }>;
+    total_owed: number;
+    total_credit_limit: number;
+    currency: string;
+  }> => {
+    const response = await api.get('/cards/billing-summary');
+    return response.data;
+  },
+
   scanCardImage: async (imageBase64: string): Promise<{
     card_number?: string;
     cardholder_name?: string;

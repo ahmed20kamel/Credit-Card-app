@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/app/store/authStore';
 import { transactionsAPI } from '@/app/api/transactions';
+import { cardsAPI } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
 import { formatAmount, formatPercent } from '@/lib/formatNumber';
 import CurrencySymbol from '@/components/ui/CurrencySymbol';
-import { getErrorMessage } from '@/lib/errors';
 import toast from 'react-hot-toast';
-import type { Transaction, MonthlySummary, MonthlyChartData, CategoryChartData } from '@/types';
+import type { Transaction, MonthlySummary, MonthlyChartData } from '@/types';
 import {
   TrendingUp,
   TrendingDown,
@@ -21,6 +21,7 @@ import {
   CreditCard,
   BarChart3,
   ArrowUpRight,
+  CalendarClock,
 } from 'lucide-react';
 import {
   LineChart,
@@ -45,6 +46,14 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
+  const [billing, setBilling] = useState<{
+    items: Array<{
+      id: string; card_name: string; bank_name: string; card_last_four: string;
+      credit_limit: number; current_balance: number; payment_due_date: number | null;
+      minimum_payment: number | null; currency: string;
+    }>;
+    total_owed: number; total_credit_limit: number; currency: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -67,6 +76,7 @@ export default function DashboardPage() {
           new Date().getFullYear(),
           new Date().getMonth() + 1
         ).then((data) => setSummary(data)).catch(() => {}),
+        cardsAPI.billingSummary().then((data) => setBilling(data)).catch(() => {}),
       ]).finally(() => setLoading(false));
     }
   }, [isAuthenticated]);
@@ -306,6 +316,79 @@ export default function DashboardPage() {
                 <BarChart3 size={18} style={{ verticalAlign: 'middle', color: 'var(--accent)', marginRight: '0.25rem' }} />
                 {stats.topCategory}
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Billing Overview */}
+        {billing && billing.items.length > 0 && (
+          <div className="card mb-8">
+            <div className="billing-header-row">
+              <h3 className="card-section-title-small" style={{ marginBottom: 0 }}>
+                <CalendarClock size={18} style={{ verticalAlign: 'middle', marginInlineEnd: '0.5rem' }} />
+                {t('dashboard.billingOverview') || 'Billing Overview'}
+              </h3>
+              <div className="billing-total">
+                <span className="billing-total-label">{t('dashboard.totalOwed') || 'Total Owed'}:</span>
+                <span className="billing-total-amount">
+                  {formatAmount(billing.total_owed)} <CurrencySymbol code={billing.currency} size={14} />
+                </span>
+              </div>
+            </div>
+            <div className="billing-table-wrapper">
+              <table className="billing-table">
+                <thead>
+                  <tr>
+                    <th>{t('cards.cardName') || 'Card'}</th>
+                    <th>{t('cards.bankName') || 'Bank'}</th>
+                    <th>{t('cards.creditLimit') || 'Credit Limit'}</th>
+                    <th>{t('cards.outstanding') || 'Outstanding'}</th>
+                    <th>{t('cards.paymentDueDate') || 'Due Date'}</th>
+                    <th>{t('cards.minimumPayment') || 'Min Payment'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {billing.items.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <Link href={`/cards/${item.id}`} className="billing-card-link">
+                          <span>{item.card_name}</span>
+                          <span className="billing-card-digits">****{item.card_last_four}</span>
+                        </Link>
+                      </td>
+                      <td>{item.bank_name}</td>
+                      <td>{formatAmount(item.credit_limit)} <CurrencySymbol code={item.currency} size={12} /></td>
+                      <td className="billing-balance">
+                        {formatAmount(item.current_balance)} <CurrencySymbol code={item.currency} size={12} />
+                      </td>
+                      <td>
+                        {item.payment_due_date ? (
+                          <span className="billing-due-badge">
+                            <CalendarClock size={14} />
+                            {t('cards.dayOfMonth', { day: String(item.payment_due_date) }) || `Day ${item.payment_due_date}`}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td>
+                        {item.minimum_payment != null
+                          ? <>{formatAmount(item.minimum_payment)} <CurrencySymbol code={item.currency} size={12} /></>
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="billing-total-row">
+                    <td colSpan={3} style={{ textAlign: 'end' }}>{t('dashboard.totalOwed') || 'Total Owed'}</td>
+                    <td className="billing-balance">
+                      {formatAmount(billing.total_owed)} <CurrencySymbol code={billing.currency} size={12} />
+                    </td>
+                    <td colSpan={2}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                        {t('dashboard.totalCreditLimit') || 'Limit'}: {formatAmount(billing.total_credit_limit)} <CurrencySymbol code={billing.currency} size={12} />
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         )}

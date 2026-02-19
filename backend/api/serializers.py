@@ -41,7 +41,7 @@ class CardSerializer(serializers.ModelSerializer):
             'card_last_four', 'expiry_month', 'expiry_year', 'notes',
             'color_hex', 'is_favorite', 'available_balance', 'balance_currency',
             'statement_date', 'payment_due_date', 'minimum_payment', 'minimum_payment_percentage',
-            'credit_limit', 'current_balance',
+            'credit_limit', 'current_balance', 'card_benefits',
             'created_at', 'updated_at',
             'card_number', 'cardholder_name', 'cvv', 'iban'
         ]
@@ -154,7 +154,7 @@ class CardUpdateSerializer(serializers.ModelSerializer):
             'expiry_month', 'expiry_year', 'notes', 'color_hex',
             'is_favorite', 'available_balance', 'balance_currency',
             'statement_date', 'payment_due_date', 'minimum_payment', 'minimum_payment_percentage',
-            'credit_limit', 'current_balance',
+            'credit_limit', 'current_balance', 'card_benefits',
             'card_number', 'cardholder_name', 'cvv', 'iban'
         ]
     

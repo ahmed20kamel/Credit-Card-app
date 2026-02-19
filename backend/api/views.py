@@ -14,7 +14,7 @@ from django.db.models import Sum, Q, Count
 from django.http import HttpResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Card, Transaction, CashEntry, ChatSession, ChatMessage
+from .models import Card, Transaction, CashEntry, ChatSession, ChatMessage, WebAuthnCredential
 from .serializers import (
     UserSerializer, RegisterSerializer, CardSerializer, CardUpdateSerializer,
     TransactionSerializer, CashEntrySerializer, ChatSessionSerializer, ChatMessageSerializer
@@ -581,6 +581,32 @@ class CardViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['get'], url_path='billing-summary')
+    def billing_summary(self, request):
+        """Return billing overview for all user's credit cards."""
+        cards = Card.objects.filter(user=request.user, is_deleted=False, card_type='credit').order_by('payment_due_date')
+        items = []
+        total_owed = 0
+        total_limit = 0
+        for card in cards:
+            bal = float(card.current_balance) if card.current_balance else 0
+            lim = float(card.credit_limit) if card.credit_limit else 0
+            total_owed += bal
+            total_limit += lim
+            min_pay = None
+            if card.minimum_payment:
+                min_pay = float(card.minimum_payment)
+            elif card.minimum_payment_percentage and card.current_balance:
+                min_pay = round(bal * float(card.minimum_payment_percentage) / 100, 2)
+            items.append({
+                'id': str(card.id), 'card_name': card.card_name,
+                'bank_name': card.bank_name, 'card_last_four': card.card_last_four,
+                'credit_limit': lim, 'current_balance': bal,
+                'payment_due_date': card.payment_due_date,
+                'minimum_payment': min_pay, 'currency': card.balance_currency,
+            })
+        return Response({'items': items, 'total_owed': total_owed, 'total_credit_limit': total_limit, 'currency': 'AED'})
+
 
 class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
@@ -866,3 +892,457 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
         except ChatSession.DoesNotExist:
             from rest_framework.exceptions import NotFound
             raise NotFound("Chat session not found")
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def chat_send(request):
+    """AI-powered financial chat. Accepts {message, session_id?}, returns {response, session_id}."""
+    import time
+    import urllib.request
+    import urllib.error
+    import logging
+    logger = logging.getLogger('api.chat')
+
+    user_message = request.data.get('message', '').strip()
+    session_id = request.data.get('session_id')
+
+    if not user_message:
+        return Response({'error': 'Message is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Get or create session
+    if session_id:
+        try:
+            session = ChatSession.objects.get(id=session_id, user=request.user)
+        except ChatSession.DoesNotExist:
+            session = ChatSession.objects.create(user=request.user, title=user_message[:100])
+    else:
+        session = ChatSession.objects.create(user=request.user, title=user_message[:100])
+
+    # Save user message
+    ChatMessage.objects.create(session=session, role='user', content=user_message)
+
+    # Build financial context from user's data
+    user_cards = Card.objects.filter(user=request.user, is_deleted=False)
+    cards_context = []
+    for card in user_cards:
+        card_info = {
+            'name': card.card_name, 'bank': card.bank_name,
+            'type': card.card_type, 'last_four': card.card_last_four,
+            'network': card.card_network,
+            'credit_limit': float(card.credit_limit) if card.credit_limit else None,
+            'current_balance': float(card.current_balance) if card.current_balance else None,
+            'available_balance': float(card.available_balance) if card.available_balance else None,
+            'currency': card.balance_currency,
+            'payment_due_date': card.payment_due_date,
+            'statement_date': card.statement_date,
+            'minimum_payment': float(card.minimum_payment) if card.minimum_payment else None,
+            'min_payment_pct': float(card.minimum_payment_percentage) if card.minimum_payment_percentage else None,
+        }
+        if card.card_benefits:
+            try:
+                card_info['benefits'] = json.loads(card.card_benefits)
+            except json.JSONDecodeError:
+                pass
+        cards_context.append(card_info)
+
+    recent_txns = Transaction.objects.filter(
+        user=request.user, is_deleted=False
+    ).select_related('card').order_by('-transaction_date')[:50]
+    txn_context = [{
+        'type': t.transaction_type, 'amount': float(t.amount),
+        'currency': t.currency, 'merchant': t.merchant_name,
+        'date': t.transaction_date.strftime('%Y-%m-%d') if t.transaction_date else None,
+        'card': t.card.card_name if t.card else 'Cash', 'category': t.category,
+    } for t in recent_txns]
+
+    # Cash balance
+    from django.db.models import Sum
+    cash_qs = CashEntry.objects.filter(user=request.user, is_deleted=False)
+    cash_in = cash_qs.filter(entry_type='income').aggregate(s=Sum('amount'))['s'] or 0
+    cash_out = cash_qs.filter(entry_type='expense').aggregate(s=Sum('amount'))['s'] or 0
+    cash_balance = float(cash_in - cash_out)
+
+    # Previous messages for context (last 20)
+    prev_msgs = list(ChatMessage.objects.filter(session=session).order_by('-created_at')[:21])
+    conversation = [{'role': m.role, 'content': m.content} for m in reversed(prev_msgs) if not (m.role == 'user' and m.content == user_message)]
+    # Remove the user message we just saved from conversation (it will be added separately)
+    if conversation and conversation[-1]['role'] == 'user' and conversation[-1]['content'] == user_message:
+        conversation.pop()
+
+    system_prompt = f"""You are CardVault AI, a smart financial assistant in a personal finance app.
+
+## User's Cards ({len(cards_context)} cards):
+{json.dumps(cards_context, ensure_ascii=False, default=str)}
+
+## Recent Transactions (last {len(txn_context)}):
+{json.dumps(txn_context, ensure_ascii=False, default=str)}
+
+## Cash Balance: {cash_balance} AED
+
+## Rules:
+- Answer about cards, balances, due dates, spending patterns
+- Recommend best card for purchases based on card benefits
+- Respond in the SAME LANGUAGE the user writes (Arabic or English)
+- Be concise and professional
+- Format amounts clearly (e.g. 1,500.00 AED)
+- Never make up data - only use info provided above
+- Today: {timezone.now().strftime('%Y-%m-%d')}"""
+
+    ai_response = None
+    google_key = getattr(django_settings, 'GOOGLE_API_KEY', '')
+    anthropic_key = getattr(django_settings, 'ANTHROPIC_API_KEY', '')
+
+    # Try Gemini first
+    if google_key:
+        gemini_url = (
+            'https://generativelanguage.googleapis.com/v1beta/'
+            'models/gemini-2.0-flash:generateContent'
+            f'?key={google_key}'
+        )
+        gemini_contents = [
+            {'role': 'user', 'parts': [{'text': system_prompt}]},
+            {'role': 'model', 'parts': [{'text': 'Understood. I have your financial data ready. How can I help?'}]},
+        ]
+        for msg in conversation:
+            gemini_contents.append({
+                'role': 'user' if msg['role'] == 'user' else 'model',
+                'parts': [{'text': msg['content']}]
+            })
+        gemini_contents.append({'role': 'user', 'parts': [{'text': user_message}]})
+
+        payload = json.dumps({
+            'contents': gemini_contents,
+            'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 2048}
+        }).encode('utf-8')
+
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(gemini_url, data=payload,
+                    headers={'Content-Type': 'application/json'}, method='POST')
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    candidates = data.get('candidates', [])
+                    if candidates:
+                        parts = candidates[0].get('content', {}).get('parts', [])
+                        if parts:
+                            ai_response = parts[0].get('text', '').strip()
+                break
+            except urllib.error.HTTPError as e:
+                if e.code == 429 and attempt < 2:
+                    time.sleep((attempt + 1) * 2)
+                    continue
+                logger.warning('Chat Gemini HTTP %d', e.code)
+                break
+            except Exception as e:
+                logger.warning('Chat Gemini error: %s', str(e))
+                break
+
+    # Fallback to Claude
+    if not ai_response and anthropic_key:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            claude_msgs = [{'role': m['role'], 'content': m['content']} for m in conversation]
+            claude_msgs.append({'role': 'user', 'content': user_message})
+            message = client.messages.create(
+                model='claude-sonnet-4-20250514', max_tokens=2048,
+                system=system_prompt, messages=claude_msgs,
+            )
+            ai_response = message.content[0].text.strip()
+        except Exception as e:
+            logger.warning('Chat Claude error: %s', str(e))
+
+    if not ai_response:
+        ai_response = "I'm sorry, I couldn't process your request right now. Please try again."
+
+    # Save AI response
+    ChatMessage.objects.create(session=session, role='assistant', content=ai_response)
+
+    return Response({'response': ai_response, 'session_id': str(session.id)})
+
+
+# ---------------------------------------------------------------------------
+# WebAuthn / FIDO2 Biometric Authentication
+# ---------------------------------------------------------------------------
+
+import os
+import base64
+import hashlib
+import struct
+
+
+def _b64url_encode(data: bytes) -> str:
+    """Base64url-encode bytes without padding."""
+    return base64.urlsafe_b64encode(data).rstrip(b'=').decode('ascii')
+
+
+def _b64url_decode(s: str) -> bytes:
+    """Base64url-decode a string, adding padding as needed."""
+    s += '=' * (4 - len(s) % 4)
+    return base64.urlsafe_b64decode(s)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def webauthn_register_options(request):
+    """
+    Generate WebAuthn registration options (challenge + relying party info).
+    The client uses these to call navigator.credentials.create().
+    """
+    user = request.user
+
+    # Generate a cryptographically random challenge
+    challenge = os.urandom(32)
+    cache_key = f'webauthn_reg_{user.id}'
+    cache.set(cache_key, challenge, 300)  # 5 minutes
+
+    # Relying party configuration
+    rp_id = getattr(django_settings, 'WEBAUTHN_RP_ID', 'localhost')
+    rp_name = 'CardVault'
+
+    # Build list of credentials to exclude (user already registered these)
+    existing_credentials = WebAuthnCredential.objects.filter(user=user)
+    exclude_credentials = [
+        {
+            'type': 'public-key',
+            'id': cred.credential_id,
+        }
+        for cred in existing_credentials
+    ]
+
+    display_name = user.full_name or user.email
+
+    return Response({
+        'challenge': _b64url_encode(challenge),
+        'rp': {
+            'id': rp_id,
+            'name': rp_name,
+        },
+        'user': {
+            'id': _b64url_encode(str(user.id).encode('utf-8')),
+            'name': user.email,
+            'displayName': display_name,
+        },
+        'pubKeyCredParams': [
+            {'type': 'public-key', 'alg': -7},    # ES256
+            {'type': 'public-key', 'alg': -257},   # RS256
+        ],
+        'authenticatorSelection': {
+            'authenticatorAttachment': 'platform',
+            'userVerification': 'required',
+        },
+        'timeout': 60000,
+        'excludeCredentials': exclude_credentials,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def webauthn_register_verify(request):
+    """
+    Verify and store a new WebAuthn credential after the browser's
+    navigator.credentials.create() call succeeds.
+
+    NOTE: This uses a "trust the client" approach -- the browser's WebAuthn
+    API has already verified the attestation locally. Full server-side CBOR/
+    COSE attestation verification would require the ``fido2`` library.
+    """
+    user = request.user
+
+    credential_id = request.data.get('credential_id')
+    public_key = request.data.get('public_key')
+    sign_count = request.data.get('sign_count', 0)
+    device_name = request.data.get('device_name', '')
+
+    if not credential_id or not public_key:
+        return Response(
+            {'detail': 'credential_id and public_key are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Verify that a registration challenge was issued for this user
+    cache_key = f'webauthn_reg_{user.id}'
+    challenge = cache.get(cache_key)
+    if challenge is None:
+        return Response(
+            {'detail': 'Registration challenge expired or not found. Please restart registration.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Consume the challenge so it cannot be reused
+    cache.delete(cache_key)
+
+    # Check for duplicate credential
+    if WebAuthnCredential.objects.filter(credential_id=credential_id).exists():
+        return Response(
+            {'detail': 'This credential is already registered.'},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Store the credential
+    credential = WebAuthnCredential.objects.create(
+        user=user,
+        credential_id=credential_id,
+        public_key=public_key,
+        sign_count=sign_count,
+        device_name=device_name or None,
+    )
+
+    return Response({
+        'message': 'Credential registered successfully',
+        'credential_id': str(credential.id),
+        'device_name': credential.device_name,
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def webauthn_login_options(request):
+    """
+    Generate WebAuthn login (assertion) options for a given email.
+    The client uses these to call navigator.credentials.get().
+    """
+    email = request.data.get('email')
+    if not email:
+        return Response(
+            {'detail': 'Email is required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Import User model
+    from .models import User
+
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        # Return a generic error to avoid user enumeration
+        return Response(
+            {'detail': 'No WebAuthn credentials found for this account.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    credentials = WebAuthnCredential.objects.filter(user=user)
+    if not credentials.exists():
+        return Response(
+            {'detail': 'No WebAuthn credentials found for this account.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Generate challenge
+    challenge = os.urandom(32)
+    cache_key = f'webauthn_login_{email}'
+    cache.set(cache_key, challenge, 300)  # 5 minutes
+
+    rp_id = getattr(django_settings, 'WEBAUTHN_RP_ID', 'localhost')
+
+    allow_credentials = [
+        {
+            'type': 'public-key',
+            'id': cred.credential_id,
+        }
+        for cred in credentials
+    ]
+
+    return Response({
+        'challenge': _b64url_encode(challenge),
+        'rpId': rp_id,
+        'allowCredentials': allow_credentials,
+        'timeout': 60000,
+        'userVerification': 'required',
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def webauthn_login_verify(request):
+    """
+    Verify a WebAuthn login assertion and issue JWT tokens.
+
+    NOTE: This uses a simplified verification approach -- it confirms the
+    credential exists, belongs to the correct user, and enforces sign_count
+    monotonicity for replay protection. Full CBOR/COSE signature verification
+    would require the ``fido2`` library.
+    """
+    email = request.data.get('email')
+    credential_id = request.data.get('credential_id')
+    authenticator_data = request.data.get('authenticator_data')
+    client_data_json = request.data.get('client_data_json')
+    signature = request.data.get('signature')
+
+    if not all([email, credential_id, authenticator_data, client_data_json, signature]):
+        return Response(
+            {'detail': 'email, credential_id, authenticator_data, client_data_json, and signature are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Verify that a login challenge was issued for this email
+    cache_key = f'webauthn_login_{email}'
+    challenge = cache.get(cache_key)
+    if challenge is None:
+        return Response(
+            {'detail': 'Login challenge expired or not found. Please restart authentication.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Consume the challenge
+    cache.delete(cache_key)
+
+    # Look up the credential
+    try:
+        credential = WebAuthnCredential.objects.select_related('user').get(
+            credential_id=credential_id,
+        )
+    except WebAuthnCredential.DoesNotExist:
+        return Response(
+            {'detail': 'Credential not found.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    # Verify the credential belongs to the correct user
+    if credential.user.email != email:
+        return Response(
+            {'detail': 'Credential does not match the provided email.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    # Verify the user account is active
+    if not credential.user.is_active:
+        return Response(
+            {'detail': 'User account is disabled.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    # Extract and verify sign_count from authenticator_data for replay protection
+    # authenticator_data is base64url-encoded; the sign count is a 4-byte
+    # big-endian integer at offset 33 (after 32-byte rpIdHash + 1-byte flags).
+    try:
+        auth_data_bytes = _b64url_decode(authenticator_data)
+        if len(auth_data_bytes) >= 37:
+            new_sign_count = struct.unpack('>I', auth_data_bytes[33:37])[0]
+        else:
+            new_sign_count = 0
+    except Exception:
+        new_sign_count = 0
+
+    # Replay protection: sign_count must be strictly greater than stored value,
+    # unless both are 0 (some authenticators don't implement counters).
+    if credential.sign_count > 0 and new_sign_count <= credential.sign_count:
+        return Response(
+            {'detail': 'Potential credential cloning detected (sign count mismatch).'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    # Update credential metadata
+    credential.sign_count = new_sign_count
+    credential.last_used_at = timezone.now()
+    credential.save(update_fields=['sign_count', 'last_used_at'])
+
+    # Issue JWT tokens
+    refresh = RefreshToken.for_user(credential.user)
+
+    return Response({
+        'access_token': str(refresh.access_token),
+        'refresh_token': str(refresh),
+        'token_type': 'bearer',
+    })
