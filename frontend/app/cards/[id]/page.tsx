@@ -183,8 +183,13 @@ export default function CardDetailPage() {
   }
 
   const isCredit = card.card_type === 'credit';
-  const usedPercentage = card.credit_limit && card.current_balance 
-    ? (Number(card.current_balance) / Number(card.credit_limit)) * 100 
+  const currentBalance = card.current_balance != null ? Number(card.current_balance) : null;
+  const creditLimit = card.credit_limit != null ? Number(card.credit_limit) : null;
+  const availableBalance = creditLimit != null && currentBalance != null
+    ? creditLimit - currentBalance
+    : card.available_balance != null ? Number(card.available_balance) : null;
+  const usedPercentage = creditLimit && currentBalance != null
+    ? (currentBalance / creditLimit) * 100
     : 0;
   const cardColor = getCardColor();
 
@@ -383,25 +388,25 @@ export default function CardDetailPage() {
           {/* Sidebar */}
           <div className="card-detail-sidebar">
             {/* Financial Summary */}
-            {isCredit && card.credit_limit && (
+            {isCredit && creditLimit && (
               <div className="card sidebar-finance-card">
                 <div className="sidebar-finance-row">
                   <span className="sidebar-finance-label">{t('cards.creditLimit')}</span>
-                  <span className="sidebar-finance-amount">{formatAmount(card.credit_limit)} <span className="sidebar-finance-currency"><CurrencySymbol code={card.balance_currency} size={14} /></span></span>
+                  <span className="sidebar-finance-amount">{formatAmount(creditLimit)} <span className="sidebar-finance-currency"><CurrencySymbol code={card.balance_currency} size={14} /></span></span>
                 </div>
-                {card.current_balance !== null && (
+                {currentBalance !== null && (
                   <div className="sidebar-finance-row">
                     <span className="sidebar-finance-label">{t('cards.outstanding')}</span>
-                    <span className="sidebar-finance-amount sidebar-finance-danger">{formatAmount(card.current_balance)} <span className="sidebar-finance-currency"><CurrencySymbol code={card.balance_currency} size={14} /></span></span>
+                    <span className="sidebar-finance-amount sidebar-finance-danger">{formatAmount(currentBalance)} <span className="sidebar-finance-currency"><CurrencySymbol code={card.balance_currency} size={14} /></span></span>
                   </div>
                 )}
-                {card.available_balance !== null && (
+                {availableBalance !== null && (
                   <div className="sidebar-finance-row">
                     <span className="sidebar-finance-label">{t('cards.available')}</span>
-                    <span className="sidebar-finance-amount sidebar-finance-success">{formatAmount(card.available_balance)} <span className="sidebar-finance-currency"><CurrencySymbol code={card.balance_currency} size={14} /></span></span>
+                    <span className="sidebar-finance-amount sidebar-finance-success">{formatAmount(availableBalance)} <span className="sidebar-finance-currency"><CurrencySymbol code={card.balance_currency} size={14} /></span></span>
                   </div>
                 )}
-                {card.current_balance !== null && (
+                {currentBalance !== null && (
                   <div className="sidebar-usage-section">
                     <div className="sidebar-usage-header">
                       <span className="sidebar-usage-label">{t('cards.creditUsage')}</span>

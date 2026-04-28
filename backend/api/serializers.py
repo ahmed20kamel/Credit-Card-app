@@ -106,6 +106,10 @@ class CardSerializer(serializers.ModelSerializer):
                 iban_encrypted=encryption_service.encrypt(iban) if iban else None,
                 **validated_data
             )
+            # Auto-compute available_balance for credit cards
+            if card.credit_limit is not None and card.current_balance is not None:
+                card.available_balance = float(card.credit_limit) - float(card.current_balance)
+                card.save(update_fields=['available_balance'])
             return card
         except Exception as e:
             logger.exception('Card create failed: %s', e)
@@ -116,7 +120,13 @@ class CardSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         reveal = self.context.get('reveal', False)
-        
+
+        # Always derive available_balance from credit_limit - current_balance
+        credit_limit = data.get('credit_limit')
+        current_balance = data.get('current_balance')
+        if credit_limit is not None and current_balance is not None:
+            data['available_balance'] = float(credit_limit) - float(current_balance)
+
         if reveal:
             try:
                 if instance.card_number_encrypted:
@@ -221,7 +231,11 @@ class CardUpdateSerializer(serializers.ModelSerializer):
         for key, value in validated_data.items():
             if value is not None:
                 setattr(instance, key, value)
-        
+
+        # Auto-compute available_balance for credit cards
+        if instance.credit_limit is not None and instance.current_balance is not None:
+            instance.available_balance = float(instance.credit_limit) - float(instance.current_balance)
+
         instance.save()
         return instance
 
