@@ -225,7 +225,6 @@ function NewCardContent() {
         minimum_payment: num(formData.minimum_payment) ?? undefined,
         minimum_payment_percentage: num(formData.minimum_payment_percentage) ?? undefined,
         credit_limit: num(formData.credit_limit) ?? undefined,
-        current_balance: num(formData.current_balance) ?? undefined,
         last_payment_date: formData.last_payment_date || undefined,
         last_payment_amount: num(formData.last_payment_amount) ?? undefined,
         late_payment_fee: num(formData.late_payment_fee) ?? undefined,
@@ -529,11 +528,11 @@ function NewCardContent() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>{t('cards.currentBalance') || 'Current Balance'}</label>
+                      <label>{t('cards.availableBalance') || 'Available Balance'}</label>
                       <FormattedNumberInput
-                        value={formData.current_balance}
-                        onChange={(v) => setFormData({ ...formData, current_balance: v })}
-                        placeholder={t('cards.currentBalancePlaceholder') || 'e.g., 15,000'}
+                        value={formData.available_balance}
+                        onChange={(v) => setFormData({ ...formData, available_balance: v })}
+                        placeholder={t('cards.availableBalancePlaceholder') || '0.00'}
                       />
                     </div>
                     <div className="form-group">

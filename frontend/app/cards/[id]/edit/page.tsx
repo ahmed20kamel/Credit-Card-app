@@ -198,7 +198,6 @@ export default function EditCardPage() {
 
       if (formData.card_type === 'credit') {
         data.credit_limit = formData.credit_limit ? parseFloat(formData.credit_limit) : undefined;
-        data.current_balance = formData.current_balance ? parseFloat(formData.current_balance) : undefined;
         data.statement_date = formData.statement_date ? parseInt(formData.statement_date) : undefined;
         data.payment_due_date = formData.payment_due_date ? parseInt(formData.payment_due_date) : undefined;
         data.minimum_payment = formData.minimum_payment ? parseFloat(formData.minimum_payment) : undefined;
@@ -437,12 +436,12 @@ export default function EditCardPage() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>{t('cards.currentBalance') || 'Current Balance'}</label>
+                    <label>{t('cards.availableBalance') || 'Available Balance'}</label>
                     <FormattedNumberInput
-                      value={formData.current_balance}
-                      onChange={(v) => setFormData(p => ({ ...p, current_balance: v }))}
+                      value={formData.available_balance}
+                      onChange={(v) => setFormData(p => ({ ...p, available_balance: v }))}
                       className="form-input"
-                      placeholder={t('cards.currentBalancePlaceholder') || 'e.g., 15,000'}
+                      placeholder={t('cards.availableBalancePlaceholder') || '0.00'}
                     />
                   </div>
                   <div className="form-group">
