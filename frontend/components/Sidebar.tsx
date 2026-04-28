@@ -11,6 +11,7 @@ import {
   Settings,
   Menu,
   X,
+  Wallet,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslations } from '@/lib/i18n';
@@ -66,12 +67,10 @@ export default function Sidebar({ userEmail, onLogout }: SidebarProps) {
         <div className="flex flex-col" style={{ height: '100%' }}>
           {/* Logo Section */}
           <div className="sidebar-header">
-            <h1 className="sidebar-title" suppressHydrationWarning>
-              {t('common.appName')}
-            </h1>
-            <p className="sidebar-subtitle" suppressHydrationWarning>
-              {t('common.appDescription')}
-            </p>
+            <a href="/dashboard" className="sidebar-brand">
+              <Wallet size={22} />
+              <span suppressHydrationWarning>{t('common.appName')}</span>
+            </a>
           </div>
 
           {/* Navigation */}

@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/app/store/authStore';
 import { useTranslations } from '@/lib/i18n';
-import { CreditCard, User, LogOut, Moon, Sun } from 'lucide-react';
+import { User, LogOut, Moon, Sun } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { getResolvedTheme, setTheme } from '@/lib/theme';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -65,11 +65,6 @@ export default function Navbar() {
   return (
     <nav className="navbar" role="banner" aria-label="Top navigation">
       <div className="navbar-content">
-        <a href="/dashboard" className="navbar-brand">
-          <CreditCard size={20} />
-          <span>{t('common.appName')}</span>
-        </a>
-
         <div className="navbar-actions">
           <button
             onClick={toggleTheme}
@@ -130,3 +125,4 @@ export default function Navbar() {
     </nav>
   );
 }
+
