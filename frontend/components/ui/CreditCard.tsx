@@ -133,9 +133,9 @@ export function CreditCard({
   };
 
   return (
-    <div className={`credit-card-form-ltr ${className ?? ''}`.trim()} dir="ltr">
+    <div className={`credit-card-form-ltr ${className ?? ''}`.trim()}>
       {/* Card Preview - always LTR so number reads left-to-right */}
-      <div className="credit-card-preview-wrapper">
+      <div className="credit-card-preview-wrapper" dir="ltr">
         <div className="credit-card-perspective">
           <div
             className="credit-card-3d"

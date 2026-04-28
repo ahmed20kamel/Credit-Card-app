@@ -6,7 +6,7 @@ import { useAuthStore } from '@/app/store/authStore';
 import { cardsAPI } from '@/app/api/cards';
 import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
-import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Upload, Loader2, Shield, X, CheckCircle, ScanLine, Star } from 'lucide-react';
+import { ArrowLeft, CreditCard as CreditCardIcon, Building2, Wallet, FileText, Camera, Upload, Loader2, Shield, X, CheckCircle, ScanLine, Star, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CreditCard, type CreditCardValue } from '@/components/ui/CreditCard';
 import { CameraCardScanner, type ScanResult } from '@/components/ui/CameraCardScanner';
@@ -36,10 +36,14 @@ function NewCardContent() {
     cvvLabel: 'CVV',
   });
   const [benefitInput, setBenefitInput] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [bankEmails, setBankEmails] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     card_name: '',
     bank_name: '',
     card_type: 'credit',
+    card_category: '',
+    card_ownership: '',
     card_network: '',
     iban: '',
     notes: '',
@@ -52,6 +56,19 @@ function NewCardContent() {
     minimum_payment_percentage: '',
     credit_limit: '',
     current_balance: '',
+    last_payment_date: '',
+    last_payment_amount: '',
+    late_payment_fee: '',
+    over_limit_fee: '',
+    supplementary_card_fee: '',
+    annual_fee: '',
+    fee_due_date: '',
+    renewal_type: '',
+    has_waiver_condition: false,
+    waiver_condition: '',
+    card_replacement_fee: '',
+    account_manager_name: '',
+    account_manager_phone: '',
     card_benefits: [] as string[],
   });
 
@@ -172,6 +189,14 @@ function NewCardContent() {
     }
   };
 
+  const addEmail = () => {
+    const val = emailInput.trim().toLowerCase();
+    if (val && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val) && !bankEmails.includes(val)) {
+      setBankEmails(prev => [...prev, val]);
+      setEmailInput('');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -183,6 +208,8 @@ function NewCardContent() {
         card_name: formData.card_name || '',
         bank_name: formData.bank_name || '',
         card_type: (formData.card_type || 'credit') as 'credit' | 'debit' | 'prepaid',
+        card_category: formData.card_category || undefined,
+        card_ownership: formData.card_ownership || undefined,
         card_network: formData.card_network || undefined,
         card_number: creditCard.cardNumber.replace(/\s/g, ''),
         cardholder_name: creditCard.cardholderName || undefined,
@@ -199,6 +226,20 @@ function NewCardContent() {
         minimum_payment_percentage: num(formData.minimum_payment_percentage) ?? undefined,
         credit_limit: num(formData.credit_limit) ?? undefined,
         current_balance: num(formData.current_balance) ?? undefined,
+        last_payment_date: formData.last_payment_date || undefined,
+        last_payment_amount: num(formData.last_payment_amount) ?? undefined,
+        late_payment_fee: num(formData.late_payment_fee) ?? undefined,
+        over_limit_fee: num(formData.over_limit_fee) ?? undefined,
+        supplementary_card_fee: num(formData.supplementary_card_fee) ?? undefined,
+        annual_fee: num(formData.annual_fee) ?? undefined,
+        fee_due_date: formData.fee_due_date || undefined,
+        renewal_type: formData.renewal_type || undefined,
+        has_waiver_condition: formData.has_waiver_condition,
+        waiver_condition: formData.has_waiver_condition ? (formData.waiver_condition || undefined) : undefined,
+        card_replacement_fee: num(formData.card_replacement_fee) ?? undefined,
+        account_manager_name: formData.account_manager_name || undefined,
+        account_manager_phone: formData.account_manager_phone || undefined,
+        bank_emails: bankEmails.length > 0 ? JSON.stringify(bankEmails) : undefined,
         card_benefits: formData.card_benefits.length > 0 ? JSON.stringify(formData.card_benefits) : undefined,
       };
       await cardsAPI.create(data);
@@ -345,7 +386,7 @@ function NewCardContent() {
                   <h3 className="form-section-title">{t('cards.basicInformation') || 'Basic Information'}</h3>
                 </div>
 
-                <div className="grid grid-2">
+                <div className="grid grid-4">
                   <div className="form-group">
                     <label>{t('cards.cardName') || 'Card Name'} *</label>
                     <input
@@ -353,7 +394,7 @@ function NewCardContent() {
                       required
                       value={formData.card_name}
                       onChange={(e) => setFormData({ ...formData, card_name: e.target.value })}
-                      placeholder="e.g., Personal Credit Card"
+                      placeholder={t('cards.cardNamePlaceholder') || 'e.g., Personal Credit Card'}
                     />
                   </div>
 
@@ -366,12 +407,12 @@ function NewCardContent() {
                       options={UAE_BANKS}
                       placeholder={t('common.selectBank') || 'Search or select bank...'}
                       noMatchesText={t('common.noMatches') || 'No matches'}
+                      creatable
+                      createText={t('common.add') || 'Add'}
                       aria-label={t('cards.bankName') || 'Bank Name'}
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-2">
                   <div className="form-group">
                     <label>{t('cards.cardType') || 'Card Type'} *</label>
                     <SearchableSelect
@@ -382,7 +423,55 @@ function NewCardContent() {
                       optionValues={['credit', 'debit', 'prepaid']}
                       placeholder={t('common.search')}
                       noMatchesText={t('common.noMatches')}
+                      creatable
+                      createText={t('common.add') || 'Add'}
                       aria-label={t('cards.cardType')}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>{t('cards.cardCategory') || 'Card Category'}</label>
+                    <SearchableSelect
+                      value={formData.card_category}
+                      onChange={(v) => setFormData({ ...formData, card_category: v })}
+                      options={[
+                        t('common.none') || 'None',
+                        t('cards.category_classic'),
+                        t('cards.category_gold'),
+                        t('cards.category_platinum'),
+                        t('cards.category_signature'),
+                        t('cards.category_infinite'),
+                        t('cards.category_titanium'),
+                        t('cards.category_business'),
+                        t('cards.category_world'),
+                        t('cards.category_world_elite'),
+                      ]}
+                      optionValues={['', 'classic', 'gold', 'platinum', 'signature', 'infinite', 'titanium', 'business', 'world', 'world_elite']}
+                      placeholder={t('common.search')}
+                      noMatchesText={t('common.noMatches')}
+                      creatable
+                      createText={t('common.add') || 'Add'}
+                      aria-label={t('cards.cardCategory')}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>{t('cards.cardOwnership') || 'Card Ownership'}</label>
+                    <SearchableSelect
+                      value={formData.card_ownership}
+                      onChange={(v) => setFormData({ ...formData, card_ownership: v })}
+                      options={[
+                        t('common.none') || 'None',
+                        t('cards.ownership_primary'),
+                        t('cards.ownership_supplementary'),
+                        t('cards.ownership_joint'),
+                      ]}
+                      optionValues={['', 'primary', 'supplementary', 'joint']}
+                      placeholder={t('common.search')}
+                      noMatchesText={t('common.noMatches')}
+                      creatable
+                      createText={t('common.add') || 'Add'}
+                      aria-label={t('cards.cardOwnership')}
                     />
                   </div>
 
@@ -395,6 +484,8 @@ function NewCardContent() {
                       optionValues={['', 'visa', 'mastercard', 'amex', 'discover']}
                       placeholder={t('common.search')}
                       noMatchesText={t('common.noMatches')}
+                      creatable
+                      createText={t('common.add') || 'Add'}
                       aria-label={t('cards.cardNetwork')}
                     />
                   </div>
@@ -414,7 +505,7 @@ function NewCardContent() {
                     <FormattedNumberInput
                       value={formData.available_balance}
                       onChange={(v) => setFormData({ ...formData, available_balance: v })}
-                      placeholder="0.00"
+                      placeholder={t('cards.availableBalancePlaceholder') || '0.00'}
                     />
                   </div>
                 </div>
@@ -428,13 +519,13 @@ function NewCardContent() {
                     <h3 className="form-section-title">{t('cards.creditCardManagement') || 'Credit Card Management'}</h3>
                   </div>
 
-                  <div className="grid grid-2">
+                  <div className="grid grid-4">
                     <div className="form-group">
                       <label>{t('cards.creditLimit') || 'Credit Limit'}</label>
                       <FormattedNumberInput
                         value={formData.credit_limit}
                         onChange={(v) => setFormData({ ...formData, credit_limit: v })}
-                        placeholder="e.g., 50,000"
+                        placeholder={t('cards.creditLimitPlaceholder') || 'e.g., 50,000'}
                       />
                     </div>
                     <div className="form-group">
@@ -442,7 +533,7 @@ function NewCardContent() {
                       <FormattedNumberInput
                         value={formData.current_balance}
                         onChange={(v) => setFormData({ ...formData, current_balance: v })}
-                        placeholder="e.g., 15,000"
+                        placeholder={t('cards.currentBalancePlaceholder') || 'e.g., 15,000'}
                       />
                     </div>
                     <div className="form-group">
@@ -453,7 +544,7 @@ function NewCardContent() {
                         max="31"
                         value={formData.statement_date}
                         onChange={(e) => setFormData({ ...formData, statement_date: e.target.value })}
-                        placeholder="e.g., 15"
+                        placeholder={t('cards.statementDatePlaceholder') || 'e.g., 15'}
                       />
                     </div>
                     <div className="form-group">
@@ -464,7 +555,7 @@ function NewCardContent() {
                         max="31"
                         value={formData.payment_due_date}
                         onChange={(e) => setFormData({ ...formData, payment_due_date: e.target.value })}
-                        placeholder="e.g., 10"
+                        placeholder={t('cards.paymentDueDatePlaceholder') || 'e.g., 10'}
                       />
                     </div>
                     <div className="form-group">
@@ -472,7 +563,7 @@ function NewCardContent() {
                       <FormattedNumberInput
                         value={formData.minimum_payment}
                         onChange={(v) => setFormData({ ...formData, minimum_payment: v })}
-                        placeholder="e.g., 500"
+                        placeholder={t('cards.minimumPaymentPlaceholder') || 'e.g., 500'}
                       />
                       <p className="form-hint">{t('cards.minimumPaymentHint') || 'Fixed amount, or use % below'}</p>
                     </div>
@@ -485,13 +576,191 @@ function NewCardContent() {
                         step="0.5"
                         value={formData.minimum_payment_percentage}
                         onChange={(e) => setFormData({ ...formData, minimum_payment_percentage: e.target.value })}
-                        placeholder="e.g., 5"
+                        placeholder={t('cards.minimumPaymentPercentPlaceholder') || 'e.g., 5'}
                       />
                       <p className="form-hint">{t('cards.minimumPaymentPercentHint') || 'e.g. 5 = 5% of amount due (varies by bank)'}</p>
+                    </div>
+                    <div className="form-group">
+                      <label>{t('cards.lastPaymentDate') || 'Last Payment Date'}</label>
+                      <input
+                        type="date"
+                        value={formData.last_payment_date}
+                        onChange={(e) => setFormData({ ...formData, last_payment_date: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>{t('cards.lastPaymentAmount') || 'Last Payment Amount'}</label>
+                      <FormattedNumberInput
+                        value={formData.last_payment_amount}
+                        onChange={(v) => setFormData({ ...formData, last_payment_amount: v })}
+                        placeholder={t('cards.lastPaymentAmountPlaceholder') || 'e.g., 2,000'}
+                      />
                     </div>
                   </div>
                 </div>
               )}
+
+              {/* Fees, Renewal & Contact */}
+              <div className="form-section">
+                <div className="section-header">
+                  <Receipt size={20} />
+                  <h3 className="form-section-title">{t('cards.feesRenewalSection') || 'Fees, Renewal & Contact'}</h3>
+                </div>
+
+                <div className="grid grid-4">
+                  <div className="form-group">
+                    <label>{t('cards.annualFee') || 'Annual Fee'}</label>
+                    <FormattedNumberInput
+                      value={formData.annual_fee}
+                      onChange={(v) => setFormData({ ...formData, annual_fee: v })}
+                      placeholder={t('cards.annualFeePlaceholder') || 'e.g., 500'}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>{t('cards.feeDueDate') || 'Fee Due Date'}</label>
+                    <input
+                      type="date"
+                      value={formData.fee_due_date}
+                      onChange={(e) => setFormData({ ...formData, fee_due_date: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>{t('cards.latePaymentFee') || 'Late Payment Fee'}</label>
+                    <FormattedNumberInput
+                      value={formData.late_payment_fee}
+                      onChange={(v) => setFormData({ ...formData, late_payment_fee: v })}
+                      placeholder={t('cards.latePaymentFeePlaceholder') || 'e.g., 250'}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>{t('cards.overLimitFee') || 'Over Limit Fee'}</label>
+                    <FormattedNumberInput
+                      value={formData.over_limit_fee}
+                      onChange={(v) => setFormData({ ...formData, over_limit_fee: v })}
+                      placeholder={t('cards.overLimitFeePlaceholder') || 'e.g., 250'}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>{t('cards.supplementaryCardFee') || 'Supplementary Card Fee'}</label>
+                    <FormattedNumberInput
+                      value={formData.supplementary_card_fee}
+                      onChange={(v) => setFormData({ ...formData, supplementary_card_fee: v })}
+                      placeholder={t('cards.supplementaryCardFeePlaceholder') || 'e.g., 150'}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>{t('cards.renewalType') || 'Renewal Type'}</label>
+                    <SearchableSelect
+                      value={formData.renewal_type}
+                      onChange={(v) => setFormData({ ...formData, renewal_type: v })}
+                      options={[
+                        t('common.none') || 'None',
+                        t('cards.renewal_automatic'),
+                        t('cards.renewal_manual'),
+                        t('cards.renewal_conditional'),
+                      ]}
+                      optionValues={['', 'automatic', 'manual', 'conditional']}
+                      placeholder={t('common.search')}
+                      noMatchesText={t('common.noMatches')}
+                      creatable
+                      createText={t('common.add') || 'Add'}
+                      aria-label={t('cards.renewalType')}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>{t('cards.cardReplacementFee') || 'Card Replacement Fee'}</label>
+                    <FormattedNumberInput
+                      value={formData.card_replacement_fee}
+                      onChange={(v) => setFormData({ ...formData, card_replacement_fee: v })}
+                      placeholder={t('cards.cardReplacementFeePlaceholder') || 'e.g., 50'}
+                    />
+                  </div>
+                </div>
+
+                {/* Waiver Condition Checkbox */}
+                <div className="form-group waiver-checkbox-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={formData.has_waiver_condition}
+                      onChange={(e) => setFormData({ ...formData, has_waiver_condition: e.target.checked, waiver_condition: e.target.checked ? formData.waiver_condition : '' })}
+                    />
+                    <span>{t('cards.hasWaiverCondition') || 'Has Waiver Condition'}</span>
+                  </label>
+                </div>
+
+                {formData.has_waiver_condition && (
+                  <div className="form-group">
+                    <label>{t('cards.waiverCondition') || 'Waiver Condition'}</label>
+                    <textarea
+                      value={formData.waiver_condition}
+                      onChange={(e) => setFormData({ ...formData, waiver_condition: e.target.value })}
+                      rows={3}
+                      placeholder={t('cards.waiverConditionPlaceholder') || 'e.g., Spend AED 5,000/month to waive annual fee'}
+                    />
+                  </div>
+                )}
+
+                {/* Contact & Support */}
+                <div className="contact-support-subsection">
+                  <h4 className="subsection-title">{t('cards.contactSupportTitle') || 'Contact & Support'}</h4>
+                  <div className="grid grid-2">
+                    <div className="form-group">
+                      <label>{t('cards.accountManagerName') || 'Account Manager Name'}</label>
+                      <input
+                        type="text"
+                        value={formData.account_manager_name}
+                        onChange={(e) => setFormData({ ...formData, account_manager_name: e.target.value })}
+                        placeholder={t('cards.accountManagerNamePlaceholder') || 'e.g., Ahmed Al-Rashid (Bank RM)'}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>{t('cards.accountManagerPhone') || 'Account Manager Phone'}</label>
+                      <input
+                        type="tel"
+                        value={formData.account_manager_phone}
+                        onChange={(e) => setFormData({ ...formData, account_manager_phone: e.target.value })}
+                        placeholder={t('cards.accountManagerPhonePlaceholder') || 'e.g., +971 50 123 4567'}
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>{t('cards.bankEmails') || 'Bank Emails'}</label>
+                    <div className="benefits-input-row">
+                      <input
+                        type="email"
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEmail(); } }}
+                        placeholder={t('cards.bankEmailsPlaceholder') || 'e.g., support@bank.com'}
+                        dir="ltr"
+                      />
+                      <button type="button" className="btn btn-secondary" onClick={addEmail}>
+                        {t('cards.addEmail') || 'Add'}
+                      </button>
+                    </div>
+                    {bankEmails.length > 0 && (
+                      <div className="benefits-tags">
+                        {bankEmails.map((email, i) => (
+                          <span key={i} className="benefit-tag">
+                            {email}
+                            <button
+                              type="button"
+                              onClick={() => setBankEmails(prev => prev.filter((_, idx) => idx !== i))}
+                              className="benefit-tag-remove"
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* Benefits */}
               <div className="form-section">

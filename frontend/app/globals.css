@@ -174,6 +174,12 @@ body {
   letter-spacing: -0.01em;
 }
 
+[dir="rtl"] body,
+[dir="rtl"] {
+  font-family: 'Cairo', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  letter-spacing: 0;
+}
+
 /* ============================================
    TYPOGRAPHY
    ============================================ */
@@ -1439,9 +1445,10 @@ p {
 }
 
 .page-header-section {
-  margin-bottom: var(--space-4);
-  padding-bottom: var(--space-4);
-  border-bottom: 2px solid var(--primary-bg);
+  margin-bottom: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
 }
 
 .btn-back {
@@ -1582,29 +1589,16 @@ p {
   align-items: center;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
-  padding-bottom: var(--space-3);
-  border-bottom: 2px solid var(--border-light);
-  transition: var(--transition);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--primary-bg);
+  border-left: 3px solid var(--primary);
   position: relative;
 }
 
-.section-header::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background: var(--primary);
-  transition: width 0.3s ease;
-}
-
-.section-header:hover::after {
-  width: 60px;
-}
-
-.section-header:hover {
-  border-bottom-color: var(--gray-300);
+[dir="rtl"] .section-header {
+  border-left: none;
+  border-right: 3px solid var(--primary);
 }
 
 .section-header svg {
@@ -2434,7 +2428,7 @@ tr:hover {
 
 .grid {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .grid-2 {
@@ -2514,11 +2508,29 @@ html[dir="rtl"] .no-rtl {
   direction: ltr !important;
 }
 
-/* Card form & preview: always LTR so card number and expiry type left-to-right (no reverse typing in Arabic) */
-html[dir="rtl"] .credit-card-form-ltr,
-html[dir="rtl"] .credit-card-form-ltr * {
+/* Card PREVIEW stays LTR — card numbers read left-to-right */
+html[dir="rtl"] .credit-card-preview-wrapper,
+html[dir="rtl"] .credit-card-preview-wrapper * {
   direction: ltr !important;
   text-align: left;
+}
+
+/* Card INPUT labels/fields follow page direction */
+html[dir="rtl"] .credit-card-inputs {
+  direction: rtl;
+  text-align: right;
+}
+
+html[dir="rtl"] .credit-card-input-group label {
+  font-family: 'Cairo', sans-serif;
+  text-align: right;
+  direction: rtl;
+}
+
+html[dir="rtl"] .credit-card-error {
+  text-align: right;
+  direction: rtl;
+  font-family: 'Cairo', sans-serif;
 }
 
 [dir="rtl"] .sidebar {
@@ -2639,7 +2651,27 @@ html[dir="rtl"] .credit-card-form-ltr * {
   transform: translateX(1px);
 }
 
-/* RTL: Section header underline */
+/* ─── RTL Cairo Font ─── */
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] h4,
+[dir="rtl"] h5,
+[dir="rtl"] h6,
+[dir="rtl"] p,
+[dir="rtl"] label,
+[dir="rtl"] input,
+[dir="rtl"] textarea,
+[dir="rtl"] select,
+[dir="rtl"] button,
+[dir="rtl"] span,
+[dir="rtl"] a,
+[dir="rtl"] td,
+[dir="rtl"] th {
+  font-family: 'Cairo', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+}
+
+/* RTL: Section header */
 [dir="rtl"] .section-header::after {
   left: auto;
   right: 0;
@@ -2832,84 +2864,145 @@ html[dir="rtl"] .credit-card-form-ltr * {
    BREADCRUMBS - UNIFIED STANDARD
    ============================================ */
 
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-6);
-  padding: var(--space-2) 0;
-  font-size: 0.875rem;
-  flex-wrap: wrap;
-  min-height: 32px;
+/* ─── Page Top Bar (Breadcrumbs + Back Button) ─── */
+.page-top-bar {
+  position: sticky;
+  top: 64px;
+  z-index: 40;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  margin-bottom: var(--space-5);
+  margin-left: calc(-1 * var(--space-6));
+  margin-right: calc(-1 * var(--space-6));
+  padding: 0 var(--space-6);
 }
 
-.breadcrumb-item {
+.page-top-bar-inner {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 0;
+  height: 44px;
 }
 
-.breadcrumb-link {
+/* Back Button */
+.top-bar-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: none;
+  background: none;
   color: var(--text-secondary);
-  text-decoration: none;
-  transition: var(--transition);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.top-bar-back-btn:hover {
+  color: var(--primary);
+  background: var(--primary-bg);
+}
+
+/* Vertical divider */
+.top-bar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 var(--space-3);
+  flex-shrink: 0;
+}
+
+/* Breadcrumbs nav */
+.top-bar-breadcrumbs {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius);
-  font-weight: 500;
-}
-
-.breadcrumb-link:hover {
-  color: var(--primary);
-  background: var(--primary-bg);
-}
-
-.breadcrumb-link.breadcrumb-home {
-  color: var(--text-secondary);
-  padding: var(--space-1);
-  border-radius: var(--radius);
-  transition: var(--transition);
-}
-
-.breadcrumb-link.breadcrumb-home:hover {
-  color: var(--primary);
-  background: var(--primary-bg);
-}
-
-.breadcrumb-current {
-  color: var(--text);
-  font-weight: 600;
-  padding: var(--space-1) var(--space-2);
-  display: inline-block;
-  max-width: 300px;
+  flex-wrap: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.top-bar-crumb-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.top-bar-crumb-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  transition: color 0.15s, background 0.15s;
   white-space: nowrap;
 }
 
-.breadcrumb-collapse {
+.top-bar-crumb-link:hover {
+  color: var(--primary);
+  background: var(--primary-bg);
+}
+
+.top-bar-crumb-home {
+  padding: 3px 6px;
+  color: var(--text-secondary);
+}
+
+.top-bar-crumb-current {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--primary);
+  padding: 3px 8px;
+  background: var(--primary-bg);
+  border-radius: var(--radius);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.top-bar-crumb-sep {
+  color: var(--text-light);
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+.top-bar-crumb-collapse {
   color: var(--text-light);
   display: flex;
   align-items: center;
-  padding: var(--space-1);
-  cursor: default;
+  padding: 3px 4px;
 }
 
-.breadcrumb-separator {
-  color: var(--text-light);
-  flex-shrink: 0;
-  opacity: 0.5;
+/* RTL adjustments */
+[dir="rtl"] .top-bar-breadcrumbs {
+  direction: rtl;
 }
 
-[dir="rtl"] .breadcrumbs {
-  text-align: right;
+[dir="rtl"] .top-bar-crumb-link,
+[dir="rtl"] .top-bar-crumb-current,
+[dir="rtl"] .top-bar-back-btn {
+  font-family: 'Cairo', sans-serif;
 }
 
-[dir="rtl"] .breadcrumb-separator {
-  transform: rotate(180deg);
+/* Hide old back button inside pages since it's now in the bar */
+.page-header-section .btn-back {
+  display: none;
 }
+
+/* Old breadcrumbs (legacy - keep hidden) */
+.breadcrumbs { display: none; }
 
 /* ============================================
    BULK ACTIONS - UNIFIED SELECT & DELETE
@@ -3886,40 +3979,58 @@ html[dir="rtl"] .credit-card-form-ltr * {
    ============================================ */
 
 .form-group {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
 }
 
 .form-hint {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-top: var(--space-1);
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+[dir="rtl"] .form-hint {
+  font-size: 0.85rem;
 }
 
 .form-group label {
   display: block;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+[dir="rtl"] .form-group label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--text);
-  margin-bottom: var(--space-3);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .form-group input[type="text"],
 .form-group input[type="number"],
 .form-group input[type="email"],
 .form-group input[type="password"],
+.form-group input[type="tel"],
+.form-group input[type="date"],
 .form-group select,
 .form-group textarea {
   width: 100%;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  font-size: 0.875rem;
+  padding: 10px var(--space-4);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
   font-family: inherit;
   background: var(--bg);
   color: var(--text);
-  transition: var(--transition);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  line-height: 1.5;
 }
 
 .form-group input:focus,
@@ -4024,6 +4135,28 @@ html[dir="rtl"] .credit-card-form-ltr * {
 .searchable-select-empty {
   color: var(--text-light);
   cursor: default;
+}
+
+.searchable-select-create {
+  color: var(--primary);
+  font-weight: 600;
+  border-top: 1px dashed var(--border);
+  margin-top: 2px;
+}
+
+.searchable-select-create-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary-bg);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 700;
+  margin-inline-end: var(--space-2);
+  flex-shrink: 0;
 }
 
 .form-error {
@@ -4630,13 +4763,21 @@ html[dir="rtl"] .credit-card-form-ltr * {
 }
 
 .form-card {
-  padding: var(--space-6);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--bg-secondary);
 }
 
 .form-section {
-  margin-top: var(--space-6);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--border-light);
+  margin-top: 0;
+  padding: var(--space-5) var(--space-5);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  margin-bottom: var(--space-4);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
 .form-section:last-of-type {
@@ -4644,10 +4785,15 @@ html[dir="rtl"] .credit-card-form-ltr * {
 }
 
 .form-section-title {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   color: var(--text);
-  margin: 0 0 var(--space-4) 0;
+  margin: 0;
+}
+
+[dir="rtl"] .form-section-title {
+  font-size: 1rem;
+  font-family: 'Cairo', sans-serif;
 }
 
 /* Auto-Create Section */
@@ -5291,6 +5437,77 @@ html[dir="rtl"] .credit-card-form-ltr * {
   cursor: pointer;
   font-size: 0.9375rem;
   color: var(--text);
+}
+
+.waiver-checkbox-group {
+  margin-top: var(--space-2);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  font-size: 0.9375rem;
+  color: var(--text);
+  font-weight: 500;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+.checkbox-label:hover {
+  border-color: var(--primary);
+  background: var(--surface-3);
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.contact-support-subsection {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px dashed var(--border);
+}
+
+.subsection-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: var(--space-4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.subsection-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 14px;
+  background: var(--primary);
+  border-radius: 2px;
+}
+
+[dir="rtl"] .subsection-title {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.9375rem;
+  font-family: 'Cairo', sans-serif;
+}
+
+[dir="rtl"] .subsection-title::before {
+  order: 1;
 }
 
 .form-checkbox {

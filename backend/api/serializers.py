@@ -37,11 +37,14 @@ class CardSerializer(serializers.ModelSerializer):
     class Meta:
         model = Card
         fields = [
-            'id', 'card_name', 'bank_name', 'card_type', 'card_network',
+            'id', 'card_name', 'bank_name', 'card_type', 'card_category', 'card_ownership', 'card_network',
             'card_last_four', 'expiry_month', 'expiry_year', 'notes',
             'color_hex', 'is_favorite', 'available_balance', 'balance_currency',
             'statement_date', 'payment_due_date', 'minimum_payment', 'minimum_payment_percentage',
-            'credit_limit', 'current_balance', 'card_benefits',
+            'credit_limit', 'current_balance', 'last_payment_date', 'last_payment_amount', 'card_benefits',
+            'late_payment_fee', 'over_limit_fee', 'supplementary_card_fee', 'annual_fee',
+            'fee_due_date', 'renewal_type', 'has_waiver_condition', 'waiver_condition',
+            'card_replacement_fee', 'account_manager_name', 'account_manager_phone', 'bank_emails',
             'created_at', 'updated_at',
             'card_number', 'cardholder_name', 'cvv', 'iban'
         ]
@@ -155,11 +158,14 @@ class CardUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Card
         fields = [
-            'card_name', 'bank_name', 'card_type', 'card_network',
+            'card_name', 'bank_name', 'card_type', 'card_category', 'card_ownership', 'card_network',
             'expiry_month', 'expiry_year', 'notes', 'color_hex',
             'is_favorite', 'available_balance', 'balance_currency',
             'statement_date', 'payment_due_date', 'minimum_payment', 'minimum_payment_percentage',
-            'credit_limit', 'current_balance', 'card_benefits',
+            'credit_limit', 'current_balance', 'last_payment_date', 'last_payment_amount', 'card_benefits',
+            'late_payment_fee', 'over_limit_fee', 'supplementary_card_fee', 'annual_fee',
+            'fee_due_date', 'renewal_type', 'has_waiver_condition', 'waiver_condition',
+            'card_replacement_fee', 'account_manager_name', 'account_manager_phone', 'bank_emails',
             'card_number', 'cardholder_name', 'cvv', 'iban'
         ]
     

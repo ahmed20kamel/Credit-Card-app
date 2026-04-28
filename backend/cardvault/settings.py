@@ -14,10 +14,16 @@ DEBUG = config('DEBUG', default='False', cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0').split(',')
 
-# Render sets RENDER=true in environment
+# Render
 RENDER = config('RENDER', default='False', cast=bool)
 if RENDER:
     ALLOWED_HOSTS.append('.onrender.com')
+
+# Railway — automatically sets RAILWAY_ENVIRONMENT
+RAILWAY = bool(config('RAILWAY_ENVIRONMENT', default=''))
+if RAILWAY:
+    ALLOWED_HOSTS.append('.railway.app')
+    ALLOWED_HOSTS.append('.up.railway.app')
 
 if DEBUG:
     ALLOWED_HOSTS = ['*']
@@ -199,11 +205,14 @@ if cors_origins_env and cors_origins_env.strip() != '*':
         if origin.strip() and origin.strip().startswith('http')
     ])
 
-# Allow .onrender.com origins in production
+# Allow production origins via regex
+CORS_ALLOWED_ORIGIN_REGEXES = []
 if RENDER:
-    CORS_ALLOWED_ORIGIN_REGEXES = [
-        r'^https://.*\.onrender\.com$',
-    ]
+    CORS_ALLOWED_ORIGIN_REGEXES.append(r'^https://.*\.onrender\.com$')
+if RAILWAY:
+    CORS_ALLOWED_ORIGIN_REGEXES.append(r'^https://.*\.railway\.app$')
+    CORS_ALLOWED_ORIGIN_REGEXES.append(r'^https://.*\.up\.railway\.app$')
+    CORS_ALLOWED_ORIGIN_REGEXES.append(r'^https://.*\.vercel\.app$')
 
 CORS_ALLOW_CREDENTIALS = True
 

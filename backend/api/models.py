@@ -53,12 +53,30 @@ class AllObjectsManager(models.Manager):
 
 class Card(models.Model):
     CARD_TYPES = [('credit', 'Credit'), ('debit', 'Debit'), ('prepaid', 'Prepaid')]
-    
+    CARD_CATEGORIES = [
+        ('classic', 'Classic'),
+        ('gold', 'Gold'),
+        ('platinum', 'Platinum'),
+        ('signature', 'Signature'),
+        ('infinite', 'Infinite'),
+        ('titanium', 'Titanium'),
+        ('business', 'Business'),
+        ('world', 'World'),
+        ('world_elite', 'World Elite'),
+    ]
+    CARD_OWNERSHIP = [
+        ('primary', 'Primary'),
+        ('supplementary', 'Supplementary'),
+        ('joint', 'Joint'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cards')
     card_name = models.CharField(max_length=255)
     bank_name = models.CharField(max_length=100)
     card_type = models.CharField(max_length=50, choices=CARD_TYPES)
+    card_category = models.CharField(max_length=50, choices=CARD_CATEGORIES, null=True, blank=True)
+    card_ownership = models.CharField(max_length=50, choices=CARD_OWNERSHIP, null=True, blank=True)
     card_network = models.CharField(max_length=50, null=True, blank=True)
     card_number_encrypted = models.BinaryField()
     card_last_four = models.CharField(max_length=4)
@@ -80,7 +98,28 @@ class Card(models.Model):
     minimum_payment_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text='Min payment as % of amount due (e.g. 5 for 5%), varies by bank')
     credit_limit = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, help_text='Total credit limit')
     current_balance = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, help_text='Current outstanding balance')
+    last_payment_date = models.DateField(null=True, blank=True)
+    last_payment_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     card_benefits = models.TextField(null=True, blank=True, help_text='JSON array of card benefits/features')
+
+    RENEWAL_TYPES = [
+        ('automatic', 'Automatic'),
+        ('manual', 'Manual'),
+        ('conditional', 'Conditional'),
+    ]
+    # Fees, Renewal & Contact
+    late_payment_fee = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    over_limit_fee = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    supplementary_card_fee = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    annual_fee = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    fee_due_date = models.DateField(null=True, blank=True)
+    renewal_type = models.CharField(max_length=20, choices=RENEWAL_TYPES, null=True, blank=True)
+    has_waiver_condition = models.BooleanField(default=False)
+    waiver_condition = models.TextField(null=True, blank=True)
+    card_replacement_fee = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    account_manager_name = models.CharField(max_length=255, null=True, blank=True)
+    account_manager_phone = models.CharField(max_length=50, null=True, blank=True)
+    bank_emails = models.TextField(null=True, blank=True, help_text='JSON array of bank email addresses')
 
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
