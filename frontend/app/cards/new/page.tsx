@@ -171,32 +171,6 @@ function NewCardContent() {
     }
   }, [t, handleScanResult]);
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  const handleCreditCardChange = (value: CreditCardValue) => {
-    setCreditCard(value);
-    // Auto-detect card network
-    const cardNumber = value.cardNumber.replace(/\s/g, '');
-    let network = '';
-    if (/^4/.test(cardNumber)) network = 'visa';
-    else if (/^(5[1-5]|2[2-7])/.test(cardNumber)) network = 'mastercard';
-    else if (/^3[47]/.test(cardNumber)) network = 'amex';
-    else if (/^6/.test(cardNumber)) network = 'discover';
-
-    if (network) {
-      setFormData({ ...formData, card_network: network });
-    }
-  };
-
-  const addBenefit = () => {
-    const desc = benefitInput.description.trim();
-    if (!desc) return;
-    setBenefits(prev => [...prev, { description: desc, count: benefitInput.count, notes: benefitInput.notes }]);
-    setBenefitInput({ description: '', count: '', notes: '' });
-  };
-
   const applyExtractedData = useCallback((result: ExtractResult) => {
     const updates: Record<string, string> = {};
     if (result.card_name) updates.card_name = result.card_name;
@@ -245,6 +219,32 @@ function NewCardContent() {
     window.addEventListener('cardDataExtracted', handler);
     return () => window.removeEventListener('cardDataExtracted', handler);
   }, [applyExtractedData]);
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  const handleCreditCardChange = (value: CreditCardValue) => {
+    setCreditCard(value);
+    // Auto-detect card network
+    const cardNumber = value.cardNumber.replace(/\s/g, '');
+    let network = '';
+    if (/^4/.test(cardNumber)) network = 'visa';
+    else if (/^(5[1-5]|2[2-7])/.test(cardNumber)) network = 'mastercard';
+    else if (/^3[47]/.test(cardNumber)) network = 'amex';
+    else if (/^6/.test(cardNumber)) network = 'discover';
+
+    if (network) {
+      setFormData({ ...formData, card_network: network });
+    }
+  };
+
+  const addBenefit = () => {
+    const desc = benefitInput.description.trim();
+    if (!desc) return;
+    setBenefits(prev => [...prev, { description: desc, count: benefitInput.count, notes: benefitInput.notes }]);
+    setBenefitInput({ description: '', count: '', notes: '' });
+  };
 
   const handleDocumentExtract = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
