@@ -244,7 +244,7 @@ export default function StatementPage() {
       byFile.get(fi)!.txns.push(txn);
     }
 
-    for (const [, { cardInfo, txns, cardId }] of byFile) {
+    for (const { cardInfo, txns, cardId } of Array.from(byFile.values())) {
       try {
         const result = await cardsAPI.importStatement({
           card_info: cardInfo as Record<string, unknown>,
