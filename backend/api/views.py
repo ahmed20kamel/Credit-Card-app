@@ -1709,22 +1709,99 @@ def chat_send(request):
     ChatMessage.objects.create(session=session, role='user', content=user_message)
 
     # Build financial context from user's data
+    from django.db.models import Sum, Count, Max, Min
+    from django.db.models.functions import TruncMonth
+
     user_cards = Card.objects.filter(user=request.user, is_deleted=False)
+
+    # ── Aggregate ALL transactions per card (not just last 50) ──
+    all_txns_qs = Transaction.objects.filter(user=request.user, is_deleted=False)
+    total_count = all_txns_qs.count()
+
+    # Per-card totals
+    card_totals = {}
+    for row in all_txns_qs.values('card_id', 'transaction_type').annotate(total=Sum('amount'), cnt=Count('id')):
+        cid = str(row['card_id']) if row['card_id'] else '__cash__'
+        if cid not in card_totals:
+            card_totals[cid] = {'purchases': 0.0, 'payments': 0.0, 'refunds': 0.0, 'withdrawals': 0.0, 'count': 0}
+        t = row['transaction_type']
+        v = float(row['total'])
+        if t == 'purchase':
+            card_totals[cid]['purchases'] += v
+        elif t == 'payment':
+            card_totals[cid]['payments'] += v
+        elif t == 'refund':
+            card_totals[cid]['refunds'] += v
+        elif t == 'withdrawal':
+            card_totals[cid]['withdrawals'] += v
+        card_totals[cid]['count'] += row['cnt']
+
+    # Per-card latest transaction date
+    card_latest = {
+        str(r['card_id']): r['latest']
+        for r in all_txns_qs.values('card_id').annotate(latest=Max('transaction_date'))
+        if r['card_id']
+    }
+
+    # Category breakdown (all time, top 15)
+    category_totals = list(
+        all_txns_qs.filter(transaction_type__in=['purchase', 'withdrawal'])
+        .values('category').annotate(total=Sum('amount'), cnt=Count('id'))
+        .order_by('-total')[:15]
+    )
+
+    # Monthly spending (last 6 months)
+    from datetime import date as _date, timedelta as _td
+    six_ago = _date.today().replace(day=1) - _td(days=180)
+    monthly_data = list(
+        all_txns_qs.filter(transaction_date__date__gte=six_ago)
+        .annotate(month=TruncMonth('transaction_date'))
+        .values('month', 'transaction_type')
+        .annotate(total=Sum('amount'))
+        .order_by('month')
+    )
+    monthly_map: dict = {}
+    for row in monthly_data:
+        key = row['month'].strftime('%Y-%m')
+        if key not in monthly_map:
+            monthly_map[key] = {'month': key, 'purchases': 0.0, 'payments': 0.0, 'refunds': 0.0}
+        t = row['transaction_type']
+        if t in ('purchase', 'withdrawal'):
+            monthly_map[key]['purchases'] += float(row['total'])
+        elif t == 'payment':
+            monthly_map[key]['payments'] += float(row['total'])
+        elif t == 'refund':
+            monthly_map[key]['refunds'] += float(row['total'])
+
     cards_context = []
     for card in user_cards:
+        cid = str(card.id)
+        ct = card_totals.get(cid, {})
+        net_from_txns = ct.get('purchases', 0) + ct.get('withdrawals', 0) - ct.get('payments', 0) - ct.get('refunds', 0)
+        stored_balance = float(card.current_balance) if card.current_balance else None
+        latest_txn = card_latest.get(cid)
         card_info = {
-            'id': str(card.id),
+            'id': cid,
             'name': card.card_name, 'bank': card.bank_name,
             'type': card.card_type, 'last_four': card.card_last_four,
             'network': card.card_network,
             'credit_limit': float(card.credit_limit) if card.credit_limit else None,
-            'current_balance': float(card.current_balance) if card.current_balance else None,
+            'stored_balance': stored_balance,
+            'computed_balance_from_transactions': round(net_from_txns, 2),
             'available_balance': float(card.available_balance) if card.available_balance else None,
             'currency': card.balance_currency,
             'payment_due_date': card.payment_due_date,
             'statement_date': card.statement_date,
             'minimum_payment': float(card.minimum_payment) if card.minimum_payment else None,
             'min_payment_pct': float(card.minimum_payment_percentage) if card.minimum_payment_percentage else None,
+            'txn_summary': {
+                'total_purchases': round(ct.get('purchases', 0), 2),
+                'total_withdrawals': round(ct.get('withdrawals', 0), 2),
+                'total_payments': round(ct.get('payments', 0), 2),
+                'total_refunds': round(ct.get('refunds', 0), 2),
+                'transaction_count': ct.get('count', 0),
+                'latest_transaction': latest_txn.strftime('%Y-%m-%d') if latest_txn else None,
+            },
         }
         if card.card_benefits:
             try:
@@ -1733,18 +1810,18 @@ def chat_send(request):
                 pass
         cards_context.append(card_info)
 
-    recent_txns = Transaction.objects.filter(
-        user=request.user, is_deleted=False
-    ).select_related('card').order_by('-transaction_date')[:50]
+    # Recent 60 transactions for detailed context
+    recent_txns = all_txns_qs.select_related('card').order_by('-transaction_date')[:60]
     txn_context = [{
         'type': t.transaction_type, 'amount': float(t.amount),
         'currency': t.currency, 'merchant': t.merchant_name,
         'date': t.transaction_date.strftime('%Y-%m-%d') if t.transaction_date else None,
-        'card': t.card.card_name if t.card else 'Cash', 'category': t.category,
+        'card': t.card.card_name if t.card else 'Cash',
+        'card_last_four': t.card.card_last_four if t.card else None,
+        'category': t.category,
     } for t in recent_txns]
 
     # Cash balance
-    from django.db.models import Sum
     cash_qs = CashEntry.objects.filter(user=request.user, is_deleted=False)
     cash_in = cash_qs.filter(entry_type='income').aggregate(s=Sum('amount'))['s'] or 0
     cash_out = cash_qs.filter(entry_type='expense').aggregate(s=Sum('amount'))['s'] or 0
@@ -1764,23 +1841,28 @@ def chat_send(request):
         if card.card_last_four:
             card_id_map[card.card_last_four] = str(card.id)
 
-    system_prompt = f"""You are CardVault AI, a smart financial assistant in a personal finance app.
+    system_prompt = f"""You are CardVault AI, a smart financial assistant with FULL access to all the user's financial data.
 
-## User's Cards ({len(cards_context)} cards):
+## User's Cards ({len(cards_context)} cards) — includes ALL-TIME transaction aggregates:
 {json.dumps(cards_context, ensure_ascii=False, default=str)}
 
-## Recent Transactions (last {len(txn_context)}):
+## ALL Transactions Summary ({total_count} total transactions in database):
+- Top categories (all time): {json.dumps([{'category': r['category'] or 'Other', 'total': float(r['total']), 'count': r['cnt']} for r in category_totals], default=str)}
+- Monthly trend (last 6 months): {json.dumps(sorted(monthly_map.values(), key=lambda x: x['month']), default=str)}
+
+## Most Recent 60 Transactions (for detailed reference):
 {json.dumps(txn_context, ensure_ascii=False, default=str)}
 
 ## Cash Balance: {cash_balance} AED
 
 ## Rules:
-- Answer about cards, balances, due dates, spending patterns
-- Recommend best card for purchases based on card benefits
+- You have FULL visibility into ALL transactions (aggregated in txn_summary per card above)
+- Use computed_balance_from_transactions as the most accurate balance (sum of all txns)
+- stored_balance is what was manually entered — may differ from computed; mention both if asked
+- Answer questions about ALL spending, not just recent — use txn_summary totals
 - Respond in the SAME LANGUAGE the user writes (Arabic or English)
-- Be concise and professional
+- Be concise, accurate, and analytical — give exact numbers
 - Format amounts clearly (e.g. 1,500.00 AED)
-- Never make up data - only use info provided above
 - Today: {timezone.now().strftime('%Y-%m-%d')}
 
 ## ACTIONS - You can perform real actions!
