@@ -286,7 +286,7 @@ export default function StatementPage() {
   const currency = 'AED';
   const totalPurchases = allTransactions.filter(t => t.selected && ['purchase', 'withdrawal'].includes(t.type)).reduce((s, t) => s + t.amount, 0);
   const totalPayments = allTransactions.filter(t => t.selected && ['payment', 'refund'].includes(t.type)).reduce((s, t) => s + t.amount, 0);
-  const uniqueBanks = [...new Set(allTransactions.map(t => t._bankName).filter(Boolean))] as string[];
+  const uniqueBanks = Array.from(new Set(allTransactions.map(t => t._bankName).filter(Boolean))) as string[];
   const visibleTxns = showAllTxns ? allTransactions : allTransactions.slice(0, 15);
 
   const statusIcon = (status: FileStatus) => {
