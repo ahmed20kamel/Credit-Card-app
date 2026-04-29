@@ -50,7 +50,7 @@ export default function EditCardPage() {
   const [formData, setFormData] = useState({
     card_name: '',
     bank_name: '',
-    card_type: 'credit' as 'credit' | 'debit' | 'prepaid',
+    card_type: 'credit' as 'credit' | 'debit' | 'prepaid' | 'covered',
     card_category: '',
     card_ownership: '',
     card_network: '',
@@ -318,7 +318,7 @@ export default function EditCardPage() {
                   <label>{t('cards.cardType') || 'Card Type'} *</label>
                   <SearchableSelect
                     value={formData.card_type}
-                    onChange={(v) => setFormData(p => ({ ...p, card_type: v as 'credit' | 'debit' | 'prepaid' }))}
+                    onChange={(v) => setFormData(p => ({ ...p, card_type: v as 'credit' | 'debit' | 'prepaid' | 'covered' }))}
                     options={[t('cards.credit'), t('cards.debit'), t('cards.prepaid')]}
                     optionValues={['credit', 'debit', 'prepaid']}
                     placeholder={t('common.search')}
