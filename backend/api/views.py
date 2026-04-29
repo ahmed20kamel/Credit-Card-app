@@ -458,7 +458,170 @@ class CardViewSet(viewsets.ModelViewSet):
             )
 
         return Response(sanitized)
-    
+
+    @action(detail=False, methods=['post'], url_path='extract-document', url_name='extract-document')
+    def extract_document(self, request):
+        """
+        Smart document extractor — accepts any image or PDF (business card, statement,
+        benefits brochure, manager photo, etc.) and returns all recognized card-related fields.
+        Never stored. Processed in memory only.
+        """
+        import base64
+        import logging
+        import urllib.request
+        import urllib.error
+        import re as _re
+        logger = logging.getLogger('api.audit')
+
+        file_data = request.data.get('file')
+        file_type = request.data.get('file_type', 'image/jpeg')
+
+        if not file_data:
+            return Response({'error': 'file is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        is_pdf = file_type == 'application/pdf' or (isinstance(file_data, str) and 'application/pdf' in file_data[:50])
+
+        if file_data.startswith('data:'):
+            try:
+                header, file_data = file_data.split(',', 1)
+                if 'pdf' in header:
+                    is_pdf = True
+                    file_type = 'application/pdf'
+                elif 'png' in header:
+                    file_type = 'image/png'
+                elif 'webp' in header:
+                    file_type = 'image/webp'
+            except ValueError:
+                return Response({'error': 'Invalid file format'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            decoded = base64.b64decode(file_data, validate=True)
+        except Exception:
+            return Response({'error': 'Invalid base64 encoding'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(decoded) > 20 * 1024 * 1024:
+            return Response({'error': 'File too large. Maximum 20MB.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        anthropic_key = getattr(django_settings, 'ANTHROPIC_API_KEY', '')
+        google_key = getattr(django_settings, 'GOOGLE_API_KEY', '')
+
+        if not anthropic_key and not google_key:
+            return Response({'error': 'Document extraction not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        logger.info('Doc extract: user=%s type=%s size=%d', request.user.email, file_type, len(decoded))
+
+        prompt = (
+            'You are a smart data extractor for a credit card management app. '
+            'Analyze this document carefully — it could be a card benefits brochure, '
+            'bank statement, business card, relationship manager photo with text, '
+            'or any card-related document.\n\n'
+            'Extract ALL useful information and return a JSON object with these fields '
+            '(use null for anything not found):\n'
+            '{\n'
+            '  "card_name": "marketing name of card",\n'
+            '  "bank_name": "issuing bank name",\n'
+            '  "card_number": "digits only",\n'
+            '  "cardholder_name": "name on card",\n'
+            '  "expiry_month": "MM",\n'
+            '  "expiry_year": "YY",\n'
+            '  "card_network": "visa/mastercard/amex/discover",\n'
+            '  "credit_limit": "number only",\n'
+            '  "annual_fee": "number only",\n'
+            '  "late_payment_fee": "number only",\n'
+            '  "over_limit_fee": "number only",\n'
+            '  "minimum_payment_percentage": "number only e.g. 5",\n'
+            '  "statement_date": "day of month 1-31",\n'
+            '  "payment_due_date": "day of month 1-31",\n'
+            '  "account_manager_name": "full name of relationship manager",\n'
+            '  "account_manager_phone": "phone number with country code",\n'
+            '  "bank_emails": ["email1", "email2"],\n'
+            '  "benefits": [\n'
+            '    {"description": "benefit name", "count": "number or null", "notes": "any conditions or notes"}\n'
+            '  ]\n'
+            '}\n'
+            'Be smart: if you see a person\'s name and phone on a business card, '
+            'they are likely the account manager. '
+            'If you see a list of services, extract them as benefits with count and conditions. '
+            'Return ONLY the JSON object, nothing else.'
+        )
+
+        response_text = None
+
+        # Try Claude first (better at structured document understanding)
+        if anthropic_key:
+            try:
+                import anthropic
+                client = anthropic.Anthropic(api_key=anthropic_key)
+
+                if is_pdf:
+                    content = [
+                        {'type': 'document', 'source': {'type': 'base64', 'media_type': 'application/pdf', 'data': file_data}},
+                        {'type': 'text', 'text': prompt}
+                    ]
+                else:
+                    content = [
+                        {'type': 'image', 'source': {'type': 'base64', 'media_type': file_type, 'data': file_data}},
+                        {'type': 'text', 'text': prompt}
+                    ]
+
+                message = client.messages.create(
+                    model='claude-sonnet-4-20250514', max_tokens=2048,
+                    messages=[{'role': 'user', 'content': content}]
+                )
+                text = message.content[0].text.strip()
+                if '{' in text:
+                    response_text = text
+                    logger.info('Doc extract: Claude success user=%s', request.user.email)
+            except Exception as e:
+                logger.warning('Doc extract: Claude error: %s', str(e))
+
+        # Fallback to Gemini (images only)
+        if not response_text and google_key and not is_pdf:
+            try:
+                gemini_url = (
+                    'https://generativelanguage.googleapis.com/v1beta/'
+                    f'models/gemini-2.0-flash:generateContent?key={google_key}'
+                )
+                gemini_body = {
+                    'contents': [{'parts': [
+                        {'text': prompt},
+                        {'inline_data': {'mime_type': file_type, 'data': file_data}}
+                    ]}]
+                }
+                payload = json.dumps(gemini_body).encode('utf-8')
+                req = urllib.request.Request(gemini_url, data=payload,
+                    headers={'Content-Type': 'application/json'}, method='POST')
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    candidates = data.get('candidates', [])
+                    if candidates:
+                        parts = candidates[0].get('content', {}).get('parts', [])
+                        if parts:
+                            response_text = parts[0].get('text', '').strip()
+                            logger.info('Doc extract: Gemini success user=%s', request.user.email)
+            except Exception as e:
+                logger.warning('Doc extract: Gemini error: %s', str(e))
+
+        if not response_text:
+            return Response({'error': 'Could not extract information from document.'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        # Parse JSON
+        try:
+            if '```' in response_text:
+                fenced = _re.search(r'```(?:json)?\s*\n?(.*?)\n?\s*```', response_text, _re.DOTALL)
+                if fenced:
+                    response_text = fenced.group(1).strip()
+            if not response_text.startswith('{'):
+                json_match = _re.search(r'\{.*\}', response_text, _re.DOTALL)
+                if json_match:
+                    response_text = json_match.group(0)
+            result = json.loads(response_text)
+        except json.JSONDecodeError:
+            return Response({'error': 'Could not parse extracted data.'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        logger.info('Doc extract result: user=%s fields=%s', request.user.email, list(result.keys()))
+        return Response(result)
+
     @action(detail=False, methods=['post'], url_path='parse-sms', url_name='parse-sms')
     def parse_sms(self, request):
         """

@@ -66,6 +66,31 @@ export const cardsAPI = {
     return response.data;
   },
 
+  extractDocument: async (fileBase64: string, fileType: string): Promise<{
+    card_name?: string;
+    bank_name?: string;
+    card_number?: string;
+    cardholder_name?: string;
+    expiry_month?: string;
+    expiry_year?: string;
+    card_network?: string;
+    credit_limit?: string;
+    annual_fee?: string;
+    late_payment_fee?: string;
+    over_limit_fee?: string;
+    minimum_payment_percentage?: string;
+    statement_date?: string;
+    payment_due_date?: string;
+    account_manager_name?: string;
+    account_manager_phone?: string;
+    bank_emails?: string[];
+    benefits?: { description: string; count: string | null; notes: string | null }[];
+    error?: string;
+  }> => {
+    const response = await api.post('/cards/extract-document', { file: fileBase64, file_type: fileType });
+    return response.data;
+  },
+
   scanCardImage: async (imageBase64: string): Promise<{
     card_number?: string;
     cardholder_name?: string;

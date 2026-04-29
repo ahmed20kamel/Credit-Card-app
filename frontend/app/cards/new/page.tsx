@@ -35,9 +35,12 @@ function NewCardContent() {
     cvv: '',
     cvvLabel: 'CVV',
   });
-  const [benefitInput, setBenefitInput] = useState('');
+  const [benefitInput, setBenefitInput] = useState({ description: '', count: '', notes: '' });
   const [emailInput, setEmailInput] = useState('');
   const [bankEmails, setBankEmails] = useState<string[]>([]);
+  const [benefits, setBenefits] = useState<{ description: string; count: string; notes: string }[]>([]);
+  const [extracting, setExtracting] = useState(false);
+  const docInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     card_name: '',
     bank_name: '',
@@ -184,10 +187,71 @@ function NewCardContent() {
   };
 
   const addBenefit = () => {
-    const val = benefitInput.trim();
-    if (val && !formData.card_benefits.includes(val)) {
-      setFormData(prev => ({ ...prev, card_benefits: [...prev.card_benefits, val] }));
-      setBenefitInput('');
+    const desc = benefitInput.description.trim();
+    if (!desc) return;
+    setBenefits(prev => [...prev, { description: desc, count: benefitInput.count, notes: benefitInput.notes }]);
+    setBenefitInput({ description: '', count: '', notes: '' });
+  };
+
+  const handleDocumentExtract = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setExtracting(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const result = await cardsAPI.extractDocument(dataUrl, file.type);
+      if (result.error) { toast.error(result.error); return; }
+
+      // Fill form fields from extracted data
+      const updates: Record<string, string> = {};
+      if (result.card_name) updates.card_name = result.card_name;
+      if (result.bank_name) updates.bank_name = result.bank_name;
+      if (result.credit_limit) updates.credit_limit = result.credit_limit;
+      if (result.annual_fee) updates.annual_fee = result.annual_fee;
+      if (result.late_payment_fee) updates.late_payment_fee = result.late_payment_fee;
+      if (result.over_limit_fee) updates.over_limit_fee = result.over_limit_fee;
+      if (result.minimum_payment_percentage) updates.minimum_payment_percentage = result.minimum_payment_percentage;
+      if (result.statement_date) updates.statement_date = result.statement_date;
+      if (result.payment_due_date) updates.payment_due_date = result.payment_due_date;
+      if (result.account_manager_name) updates.account_manager_name = result.account_manager_name;
+      if (result.account_manager_phone) updates.account_manager_phone = result.account_manager_phone;
+      if (Object.keys(updates).length > 0) setFormData(prev => ({ ...prev, ...updates }));
+
+      // Fill card number fields
+      if (result.card_number || result.cardholder_name || result.expiry_month || result.expiry_year) {
+        setCreditCard(prev => ({
+          ...prev,
+          ...(result.card_number ? { cardNumber: result.card_number.replace(/(\d{4})/g, '$1 ').trim() } : {}),
+          ...(result.cardholder_name ? { cardholderName: result.cardholder_name } : {}),
+          ...(result.expiry_month ? { expiryMonth: result.expiry_month.padStart(2, '0') } : {}),
+          ...(result.expiry_year ? { expiryYear: result.expiry_year.length === 4 ? result.expiry_year.slice(2) : result.expiry_year } : {}),
+        }));
+      }
+
+      // Fill emails
+      if (result.bank_emails?.length) setBankEmails(prev => [...new Set([...prev, ...result.bank_emails!])]);
+
+      // Fill benefits
+      if (result.benefits?.length) {
+        setBenefits(prev => [...prev, ...result.benefits!.map(b => ({
+          description: b.description,
+          count: b.count ?? '',
+          notes: b.notes ?? '',
+        }))]);
+      }
+
+      const totalFields = Object.keys(updates).length + (result.benefits?.length ?? 0);
+      toast.success(`تم استخراج ${totalFields} حقل من الملف`);
+    } catch {
+      toast.error('فشل تحليل الملف، جرب مرة أخرى');
+    } finally {
+      setExtracting(false);
     }
   };
 
@@ -243,7 +307,7 @@ function NewCardContent() {
         account_manager_name: formData.account_manager_name || undefined,
         account_manager_phone: formData.account_manager_phone || undefined,
         bank_emails: bankEmails.length > 0 ? JSON.stringify(bankEmails) : undefined,
-        card_benefits: formData.card_benefits.length > 0 ? JSON.stringify(formData.card_benefits) : undefined,
+        card_benefits: benefits.length > 0 ? JSON.stringify(benefits) : undefined,
       };
       await cardsAPI.create(data);
       toast.success(t('success.cardCreated') || 'Card created successfully');
@@ -793,37 +857,81 @@ function NewCardContent() {
                 </div>
               </div>
 
+              {/* Document Extractor */}
+              <div className="form-section">
+                <div className="section-header">
+                  <FileText size={20} />
+                  <h3 className="form-section-title">{'تحليل ملف ذكي'}</h3>
+                </div>
+                <p className="form-hint">{'ارفع أي ملف (PDF مزايا، صورة مدير الحساب، كشف حساب) — النظام يستخرج كل المعلومات تلقائياً'}</p>
+                <div className="benefits-input-row">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => docInputRef.current?.click()}
+                    disabled={extracting}
+                  >
+                    {extracting ? <><Loader2 size={16} className="scan-spinner" /> {'جاري التحليل...'}</> : <><Upload size={16} /> {'رفع ملف أو صورة'}</>}
+                  </button>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #888)' }}>{'PDF, JPG, PNG — حتى 20MB'}</span>
+                </div>
+                <input ref={docInputRef} type="file" accept="image/*,.pdf" onChange={handleDocumentExtract} style={{ display: 'none' }} />
+              </div>
+
               {/* Benefits */}
               <div className="form-section">
                 <div className="section-header">
                   <Star size={20} />
                   <h3 className="form-section-title">{t('cards.benefits') || 'Card Benefits'}</h3>
                 </div>
-                <p className="form-hint">{t('cards.benefitsHint') || 'Add the perks and features of this card'}</p>
-                <div className="benefits-input-row">
-                  <input
-                    type="text"
-                    value={benefitInput}
-                    onChange={(e) => setBenefitInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBenefit(); } }}
-                    placeholder={t('cards.benefitsPlaceholder') || 'e.g., Airport lounge access'}
-                  />
-                  <button type="button" className="btn btn-secondary" onClick={addBenefit}>
-                    {t('cards.addBenefit') || 'Add'}
-                  </button>
+                <p className="form-hint">{'أضف مزايا البطاقة مع عدد المرات والملاحظات'}</p>
+
+                {/* Structured benefit input */}
+                <div className="grid grid-4" style={{ marginBottom: '8px' }}>
+                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                    <label>{'الميزة / الخدمة'}</label>
+                    <input
+                      type="text"
+                      value={benefitInput.description}
+                      onChange={(e) => setBenefitInput(p => ({ ...p, description: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBenefit(); } }}
+                      placeholder={'مثال: دخول صالة المطار'}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>{'عدد المرات'}</label>
+                    <input
+                      type="text"
+                      value={benefitInput.count}
+                      onChange={(e) => setBenefitInput(p => ({ ...p, count: e.target.value }))}
+                      placeholder={'مثال: 3'}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>{'ملاحظات'}</label>
+                    <input
+                      type="text"
+                      value={benefitInput.notes}
+                      onChange={(e) => setBenefitInput(p => ({ ...p, notes: e.target.value }))}
+                      placeholder={'مثال: في الشهر'}
+                    />
+                  </div>
                 </div>
-                {formData.card_benefits.length > 0 && (
-                  <div className="benefits-tags">
-                    {formData.card_benefits.map((b, i) => (
-                      <span key={i} className="benefit-tag">
-                        {b}
-                        <button type="button" onClick={() => setFormData(prev => ({
-                          ...prev,
-                          card_benefits: prev.card_benefits.filter((_, idx) => idx !== i)
-                        }))} className="benefit-tag-remove">
+                <button type="button" className="btn btn-secondary" onClick={addBenefit} style={{ marginBottom: '12px' }}>
+                  {t('cards.addBenefit') || 'Add'}
+                </button>
+
+                {benefits.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {benefits.map((b, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'var(--bg-secondary, #f5f5f5)', borderRadius: '8px', fontSize: '0.82rem' }}>
+                        <span style={{ flex: 1 }}>{b.description}</span>
+                        {b.count && <span style={{ padding: '2px 8px', background: 'var(--primary-light, #e8f4ff)', borderRadius: '12px', fontSize: '0.72rem' }}>× {b.count}</span>}
+                        {b.notes && <span style={{ color: 'var(--text-muted, #888)', fontSize: '0.72rem' }}>{b.notes}</span>}
+                        <button type="button" onClick={() => setBenefits(prev => prev.filter((_, idx) => idx !== i))} className="benefit-tag-remove">
                           <X size={12} />
                         </button>
-                      </span>
+                      </div>
                     ))}
                   </div>
                 )}
