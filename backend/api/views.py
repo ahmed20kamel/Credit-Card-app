@@ -826,17 +826,28 @@ class CardViewSet(viewsets.ModelViewSet):
 
         # Handle PDF password decryption
         if is_pdf:
+            pikepdf_available = False
             try:
-                import pikepdf, io as _io
+                import pikepdf as _pikepdf
+                import io as _io
+                pikepdf_available = True
+            except ImportError:
+                logger.warning('Statement parse: pikepdf not available, skipping password check')
+
+            if pikepdf_available:
+                is_encrypted = False
                 try:
-                    pikepdf.open(_io.BytesIO(decoded))
-                    # PDF opens without password — not encrypted
-                except pikepdf.PasswordError:
-                    # PDF is encrypted — need password
+                    with _pikepdf.open(_io.BytesIO(decoded)):
+                        pass  # opens fine — not encrypted
+                except _pikepdf.PasswordError:
+                    is_encrypted = True
+                except Exception as e:
+                    logger.warning('Statement parse: pikepdf open error (non-fatal): %s', str(e))
+
+                if is_encrypted:
                     passwords_to_try = []
                     if pdf_password:
                         passwords_to_try.append(pdf_password)
-                    # Auto-try saved passwords for this bank
                     saved_pws = BankPassword.objects.filter(user=request.user)
                     for bp in saved_pws:
                         try:
@@ -847,14 +858,11 @@ class CardViewSet(viewsets.ModelViewSet):
                             pass
 
                     decrypted = None
-                    used_password = None
                     detected_bank = None
                     for pw in passwords_to_try:
                         try:
                             decrypted_bytes = self._decrypt_pdf(decoded, pw)
                             decrypted = base64.b64encode(decrypted_bytes).decode('utf-8')
-                            used_password = pw
-                            # Find which bank this password belongs to
                             for bp in saved_pws:
                                 try:
                                     if encryption_service.decrypt(bytes(bp.password_encrypted)) == pw:
@@ -869,21 +877,15 @@ class CardViewSet(viewsets.ModelViewSet):
                     if decrypted is None:
                         if not passwords_to_try:
                             return Response(
-                                {'error': 'pdf_password_required', 'message': 'هذا الملف محمي بكلمة سر. أدخل كلمة السر للمتابعة.'},
+                                {'error': 'pdf_password_required', 'message': 'هذا الملف محمي بكلمة سر.'},
                                 status=status.HTTP_400_BAD_REQUEST
                             )
                         return Response(
-                            {'error': 'pdf_password_wrong', 'message': 'كلمة السر غير صحيحة. حاول مرة أخرى.'},
+                            {'error': 'pdf_password_wrong', 'message': 'كلمة السر غير صحيحة.'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
                     file_data = decrypted
                     logger.info('Statement parse: PDF decrypted user=%s bank=%s', request.user.email, detected_bank or 'unknown')
-            except ImportError:
-                if pdf_password:
-                    return Response(
-                        {'error': 'pikepdf not available on this server.'},
-                        status=status.HTTP_503_SERVICE_UNAVAILABLE
-                    )
 
         anthropic_key = getattr(django_settings, 'ANTHROPIC_API_KEY', '')
         if not anthropic_key:
