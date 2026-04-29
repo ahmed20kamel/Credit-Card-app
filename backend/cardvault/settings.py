@@ -144,6 +144,9 @@ USE_TZ = True
 # Allow trailing slash so /api/v1/cards and /api/v1/cards/ both work (proxy sends no slash)
 APPEND_SLASH = True
 
+# Allow large base64-encoded bank statement PDFs (up to ~35MB JSON body for a 25MB file)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
+
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {

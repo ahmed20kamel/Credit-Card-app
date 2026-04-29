@@ -878,11 +878,11 @@ class CardViewSet(viewsets.ModelViewSet):
                         if not passwords_to_try:
                             return Response(
                                 {'error': 'pdf_password_required', 'message': 'هذا الملف محمي بكلمة سر.'},
-                                status=status.HTTP_400_BAD_REQUEST
+                                status=status.HTTP_200_OK
                             )
                         return Response(
                             {'error': 'pdf_password_wrong', 'message': 'كلمة السر غير صحيحة.'},
-                            status=status.HTTP_400_BAD_REQUEST
+                            status=status.HTTP_200_OK
                         )
                     file_data = decrypted
                     logger.info('Statement parse: PDF decrypted user=%s bank=%s', request.user.email, detected_bank or 'unknown')

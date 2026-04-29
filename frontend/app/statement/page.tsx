@@ -65,6 +65,7 @@ export default function StatementPage() {
   const { isRTL } = useTranslations();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const filesRef = useRef<FileEntry[]>([]);
 
   // Files
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -85,6 +86,9 @@ export default function StatementPage() {
   const [newBankPassword, setNewBankPassword] = useState('');
   const [showPwInput, setShowPwInput] = useState<Record<string, boolean>>({});
 
+  // Keep ref in sync so processAll always reads latest file state (avoids stale closure)
+  filesRef.current = files;
+
   useEffect(() => {
     cardsAPI.getBankPasswords().then(setSavedPasswords).catch(() => {});
   }, []);
@@ -99,13 +103,15 @@ export default function StatementPage() {
     });
 
   const addFiles = useCallback(async (newFiles: File[]) => {
-    const valid = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    const filtered = newFiles
-      .filter(f => valid.includes(f.type) && f.size <= 25 * 1024 * 1024)
-      .slice(0, 15);
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const validExts = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
+    const isValid = (f: File) =>
+      (validTypes.includes(f.type) || validExts.some(ext => f.name.toLowerCase().endsWith(ext)))
+      && f.size <= 25 * 1024 * 1024;
+    const filtered = newFiles.filter(isValid).slice(0, 15);
 
     if (filtered.length < newFiles.length)
-      toast('بعض الملفات تجاوزت الحد أو نوعها غير مدعوم', { icon: '⚠️' });
+      toast(`بعض الملفات تجاوزت الحد أو نوعها غير مدعوم (${newFiles.length - filtered.length} ملف)`, { icon: '⚠️' });
 
     const entries: FileEntry[] = await Promise.all(
       filtered.map(async (file) => ({
@@ -117,10 +123,7 @@ export default function StatementPage() {
       }))
     );
 
-    setFiles(prev => {
-      const combined = [...prev, ...entries].slice(0, 15);
-      return combined;
-    });
+    setFiles(prev => [...prev, ...entries].slice(0, 15));
   }, []);
 
   const removeFile = (id: string) => setFiles(prev => prev.filter(f => f.id !== id));
@@ -128,24 +131,29 @@ export default function StatementPage() {
 
   // ── Process files sequentially ─────────────────────────────────────────
   const processAll = async () => {
-    const waiting = files.filter(f => f.status === 'waiting' || f.status === 'error');
+    const currentFiles = filesRef.current;
+    const waiting = currentFiles.filter(f => f.status === 'waiting' || f.status === 'error' || (f.status === 'password_required' && f.password));
     if (!waiting.length) { toast.error('لا توجد ملفات للمعالجة'); return; }
 
     setProcessing(true);
     const collected: ParsedTxn[] = [...allTransactions];
 
-    for (let i = 0; i < files.length; i++) {
-      const entry = files[i];
+    for (let i = 0; i < filesRef.current.length; i++) {
+      const entry = filesRef.current[i];
       if (entry.status === 'done') continue;
-      if (entry.passwordRequired && !entry.password) continue;
+      if (entry.status === 'password_required' && !entry.password) continue;
+      if (entry.status === 'processing') continue;
 
       setCurrentIdx(i);
       setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'processing' } : f));
 
+      // Re-read from ref after state update to get latest password
+      const latestEntry = filesRef.current[i];
+
       try {
-        const result = await cardsAPI.parseStatement(entry.base64, entry.file.type, {
-          pdf_password: entry.password || undefined,
-          save_password: entry.savePassword,
+        const result = await cardsAPI.parseStatement(latestEntry.base64, latestEntry.file.type, {
+          pdf_password: latestEntry.password || undefined,
+          save_password: latestEntry.savePassword,
         });
 
         if (result.error === 'pdf_password_required') {
@@ -153,7 +161,7 @@ export default function StatementPage() {
           continue;
         }
         if (result.error === 'pdf_password_wrong') {
-          setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'password_required', passwordRequired: true, error: 'كلمة السر غير صحيحة' } : f));
+          setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'password_required', passwordRequired: true, error: 'كلمة السر غير صحيحة، حاول مرة أخرى' } : f));
           continue;
         }
         if (result.error) {
@@ -161,11 +169,11 @@ export default function StatementPage() {
           continue;
         }
 
-        const bankName = result.card_info?.bank_name || entry.file.name;
+        const bankName = result.card_info?.bank_name || latestEntry.file.name;
         const txns = (result.transactions || []).map(t => ({
           ...t, selected: true,
           _fileIndex: i,
-          _fileName: entry.file.name,
+          _fileName: latestEntry.file.name,
           _bankName: bankName,
         }));
 
@@ -182,8 +190,17 @@ export default function StatementPage() {
           matchedCardName: result.matched_card_name,
         } : f));
 
-      } catch {
-        setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error', error: 'فشل الاتصال' } : f));
+      } catch (err: unknown) {
+        // Handle Axios error responses (non-2xx that weren't converted to 200 yet)
+        const axiosErr = err as { response?: { data?: { error?: string } } };
+        const errCode = axiosErr?.response?.data?.error;
+        if (errCode === 'pdf_password_required') {
+          setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'password_required', passwordRequired: true, error: 'محمي بكلمة سر' } : f));
+        } else if (errCode === 'pdf_password_wrong') {
+          setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'password_required', passwordRequired: true, error: 'كلمة السر غير صحيحة، حاول مرة أخرى' } : f));
+        } else {
+          setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error', error: 'فشل الاتصال' } : f));
+        }
       }
     }
 
