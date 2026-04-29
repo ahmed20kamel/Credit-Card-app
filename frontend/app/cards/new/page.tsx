@@ -235,7 +235,7 @@ function NewCardContent() {
       }
 
       // Fill emails
-      if (result.bank_emails?.length) setBankEmails(prev => [...new Set([...prev, ...result.bank_emails!])]);
+      if (result.bank_emails?.length) setBankEmails(prev => [...prev, ...result.bank_emails!].filter((v, i, a) => a.indexOf(v) === i));
 
       // Fill benefits
       if (result.benefits?.length) {
