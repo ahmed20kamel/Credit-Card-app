@@ -773,6 +773,293 @@ class CardViewSet(viewsets.ModelViewSet):
             })
         return Response({'items': items, 'total_owed': total_owed, 'total_credit_limit': total_limit, 'total_available': total_available, 'currency': 'AED'})
 
+    @action(detail=False, methods=['post'], url_path='parse-statement', url_name='parse-statement')
+    def parse_statement(self, request):
+        """Parse a bank statement PDF/image and extract card info + all transactions."""
+        import base64
+        import re as _re
+        import logging
+        logger = logging.getLogger('api.audit')
+
+        file_data = request.data.get('file')
+        file_type = request.data.get('file_type', 'image/jpeg')
+
+        if not file_data:
+            return Response({'error': 'file is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        is_pdf = file_type == 'application/pdf'
+        if file_data.startswith('data:'):
+            try:
+                header, file_data = file_data.split(',', 1)
+                if 'pdf' in header:
+                    is_pdf = True
+                    file_type = 'application/pdf'
+                elif 'png' in header:
+                    file_type = 'image/png'
+                elif 'webp' in header:
+                    file_type = 'image/webp'
+            except ValueError:
+                return Response({'error': 'Invalid file format'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            decoded = base64.b64decode(file_data, validate=True)
+        except Exception:
+            return Response({'error': 'Invalid base64 encoding'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(decoded) > 25 * 1024 * 1024:
+            return Response({'error': 'File too large. Maximum 25MB.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        anthropic_key = getattr(django_settings, 'ANTHROPIC_API_KEY', '')
+        if not anthropic_key:
+            return Response({'error': 'Statement parsing not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        logger.info('Statement parse: user=%s type=%s size=%d', request.user.email, file_type, len(decoded))
+
+        prompt = (
+            'You are a bank statement parser for a personal finance app. '
+            'Analyze this bank statement carefully and extract ALL information.\n\n'
+            'Return a JSON object with exactly this structure:\n'
+            '{\n'
+            '  "card_info": {\n'
+            '    "bank_name": "bank name",\n'
+            '    "card_name": "card product name e.g. Platinum Credit Card",\n'
+            '    "card_last_four": "last 4 digits of card number only",\n'
+            '    "cardholder_name": "name on card/account",\n'
+            '    "credit_limit": number_or_null,\n'
+            '    "available_balance": number_or_null,\n'
+            '    "statement_balance": number_or_null,\n'
+            '    "statement_date": day_of_month_1_to_31_or_null,\n'
+            '    "payment_due_date": day_of_month_1_to_31_or_null,\n'
+            '    "payment_due_full_date": "YYYY-MM-DD or null",\n'
+            '    "minimum_payment": number_or_null,\n'
+            '    "minimum_payment_percentage": number_or_null,\n'
+            '    "annual_fee": number_or_null,\n'
+            '    "late_payment_fee": number_or_null,\n'
+            '    "over_limit_fee": number_or_null,\n'
+            '    "account_manager_name": "name or null",\n'
+            '    "account_manager_phone": "phone or null",\n'
+            '    "bank_emails": ["email1"],\n'
+            '    "currency": "AED",\n'
+            '    "statement_period_from": "YYYY-MM-DD or null",\n'
+            '    "statement_period_to": "YYYY-MM-DD or null"\n'
+            '  },\n'
+            '  "transactions": [\n'
+            '    {\n'
+            '      "date": "YYYY-MM-DD",\n'
+            '      "merchant": "merchant name or description",\n'
+            '      "amount": number,\n'
+            '      "type": "purchase or payment or refund or withdrawal",\n'
+            '      "currency": "AED",\n'
+            '      "category": "Food/Transport/Shopping/etc or null"\n'
+            '    }\n'
+            '  ]\n'
+            '}\n\n'
+            'Rules:\n'
+            '- Extract EVERY single transaction on the statement\n'
+            '- Payments to the bank/card = type "payment", purchases = "purchase", refunds = "refund"\n'
+            '- All amounts are positive numbers\n'
+            '- Use YYYY-MM-DD for all dates\n'
+            '- Return ONLY the JSON object, nothing else'
+        )
+
+        try:
+            import anthropic as _anthropic
+            client = _anthropic.Anthropic(api_key=anthropic_key)
+            if is_pdf:
+                content = [
+                    {'type': 'document', 'source': {'type': 'base64', 'media_type': 'application/pdf', 'data': file_data}},
+                    {'type': 'text', 'text': prompt}
+                ]
+            else:
+                content = [
+                    {'type': 'image', 'source': {'type': 'base64', 'media_type': file_type, 'data': file_data}},
+                    {'type': 'text', 'text': prompt}
+                ]
+            message = client.messages.create(
+                model='claude-sonnet-4-20250514', max_tokens=8192,
+                messages=[{'role': 'user', 'content': content}]
+            )
+            response_text = message.content[0].text.strip()
+            logger.info('Statement parse: Claude success user=%s', request.user.email)
+        except Exception as e:
+            logger.error('Statement parse: Claude error: %s', str(e))
+            return Response({'error': 'Could not parse statement.'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        try:
+            if '```' in response_text:
+                fenced = _re.search(r'```(?:json)?\s*\n?(.*?)\n?\s*```', response_text, _re.DOTALL)
+                if fenced:
+                    response_text = fenced.group(1).strip()
+            if not response_text.startswith('{'):
+                json_match = _re.search(r'\{.*\}', response_text, _re.DOTALL)
+                if json_match:
+                    response_text = json_match.group(0)
+            parsed_data = json.loads(response_text)
+        except json.JSONDecodeError:
+            return Response({'error': 'Could not parse extracted data.'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        card_info = parsed_data.get('card_info', {})
+        transactions_data = parsed_data.get('transactions', [])
+
+        # Try to match existing card
+        matched_card_id = None
+        matched_card_name = None
+        if card_info.get('card_last_four'):
+            existing = Card.objects.filter(
+                user=request.user,
+                card_last_four=card_info['card_last_four']
+            ).first()
+            if existing:
+                matched_card_id = str(existing.id)
+                matched_card_name = existing.card_name
+
+        logger.info('Statement parse done: user=%s bank=%s txns=%d matched_card=%s',
+                    request.user.email, card_info.get('bank_name'), len(transactions_data), matched_card_id)
+
+        return Response({
+            'card_info': card_info,
+            'transactions': transactions_data,
+            'transaction_count': len(transactions_data),
+            'matched_card_id': matched_card_id,
+            'matched_card_name': matched_card_name,
+        })
+
+    @action(detail=False, methods=['post'], url_path='import-statement', url_name='import-statement')
+    def import_statement(self, request):
+        """Save parsed statement: create/update card + bulk-create transactions."""
+        from django.utils import timezone as tz
+        from datetime import datetime, timedelta
+        import logging
+        logger = logging.getLogger('api.audit')
+
+        card_info = request.data.get('card_info', {})
+        transactions_data = request.data.get('transactions', [])
+        card_id = request.data.get('card_id')
+
+        # Resolve card
+        card = None
+        if card_id:
+            try:
+                card = Card.objects.get(id=card_id, user=request.user)
+            except Card.DoesNotExist:
+                pass
+
+        if not card and card_info.get('card_last_four'):
+            card = Card.objects.filter(
+                user=request.user,
+                card_last_four=card_info['card_last_four']
+            ).first()
+
+        created_card = False
+        if not card:
+            from .services import encryption_service as _enc
+            last_four = card_info.get('card_last_four') or '0000'
+            placeholder = '000000000000' + last_four
+            card = Card.objects.create(
+                user=request.user,
+                card_name=card_info.get('card_name') or f"{card_info.get('bank_name', 'Bank')} Card",
+                bank_name=card_info.get('bank_name', ''),
+                card_type='credit',
+                card_number_encrypted=_enc.encrypt(placeholder),
+                card_last_four=last_four,
+                cardholder_name_encrypted=_enc.encrypt(card_info['cardholder_name']) if card_info.get('cardholder_name') else None,
+                balance_currency=card_info.get('currency', 'AED'),
+                credit_limit=card_info.get('credit_limit'),
+                available_balance=card_info.get('available_balance'),
+                statement_date=card_info.get('statement_date'),
+                payment_due_date=card_info.get('payment_due_date'),
+                minimum_payment=card_info.get('minimum_payment'),
+                minimum_payment_percentage=card_info.get('minimum_payment_percentage'),
+                annual_fee=card_info.get('annual_fee'),
+                late_payment_fee=card_info.get('late_payment_fee'),
+                over_limit_fee=card_info.get('over_limit_fee'),
+                account_manager_name=card_info.get('account_manager_name'),
+                account_manager_phone=card_info.get('account_manager_phone'),
+                bank_emails=json.dumps(card_info.get('bank_emails', [])) if card_info.get('bank_emails') else None,
+            )
+            if card.credit_limit is not None and card.available_balance is not None:
+                card.current_balance = float(card.credit_limit) - float(card.available_balance)
+                card.save(update_fields=['current_balance'])
+            created_card = True
+            logger.info('Statement import: created card=%s user=%s', card.id, request.user.email)
+        else:
+            # Update card fields that are provided
+            update_fields = []
+            field_map = {
+                'credit_limit': 'credit_limit', 'available_balance': 'available_balance',
+                'statement_date': 'statement_date', 'payment_due_date': 'payment_due_date',
+                'minimum_payment': 'minimum_payment', 'minimum_payment_percentage': 'minimum_payment_percentage',
+                'annual_fee': 'annual_fee', 'late_payment_fee': 'late_payment_fee',
+                'over_limit_fee': 'over_limit_fee',
+            }
+            for info_key, model_key in field_map.items():
+                val = card_info.get(info_key)
+                if val is not None:
+                    setattr(card, model_key, val)
+                    update_fields.append(model_key)
+            if update_fields:
+                card.save(update_fields=update_fields + ['updated_at'])
+
+        # Bulk create transactions
+        VALID_TYPES = {'purchase', 'payment', 'refund', 'withdrawal', 'transfer', 'deposit'}
+        created_txns = 0
+        skipped_txns = 0
+
+        for txn_data in transactions_data:
+            try:
+                raw_date = txn_data.get('date', '')
+                try:
+                    txn_date = tz.make_aware(datetime.strptime(raw_date, '%Y-%m-%d'))
+                except (ValueError, TypeError):
+                    txn_date = tz.now()
+
+                amount = float(txn_data.get('amount', 0))
+                if amount <= 0:
+                    continue
+
+                txn_type = txn_data.get('type', 'purchase')
+                if txn_type not in VALID_TYPES:
+                    txn_type = 'purchase'
+
+                currency = txn_data.get('currency') or (card.balance_currency if card else 'AED')
+                merchant = (txn_data.get('merchant') or txn_data.get('description') or '')[:255]
+
+                dup = Transaction.objects.filter(
+                    user=request.user, card=card,
+                    amount=amount, transaction_type=txn_type,
+                    transaction_date__date=txn_date.date(),
+                ).first()
+                if dup:
+                    skipped_txns += 1
+                    continue
+
+                Transaction.objects.create(
+                    user=request.user, card=card,
+                    transaction_type=txn_type, amount=amount,
+                    currency=currency, merchant_name=merchant or None,
+                    category=txn_data.get('category') or None,
+                    transaction_date=txn_date, source='statement_import',
+                )
+                created_txns += 1
+            except Exception as e:
+                logger.warning('Statement import txn error: %s', str(e))
+                continue
+
+        if card and card.card_type == 'credit':
+            update_card_balance(card)
+
+        logger.info('Statement import done: user=%s card=%s created=%d skipped=%d',
+                    request.user.email, card.id if card else None, created_txns, skipped_txns)
+
+        from .serializers import CardSerializer as _CS
+        return Response({
+            'card': _CS(card, context={'request': request}).data if card else None,
+            'card_created': created_card,
+            'transactions_created': created_txns,
+            'transactions_skipped': skipped_txns,
+            'total_transactions': len(transactions_data),
+        })
+
 
 class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer

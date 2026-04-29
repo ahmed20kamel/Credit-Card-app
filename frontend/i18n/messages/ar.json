@@ -71,6 +71,7 @@
     "addTransaction": "إضافة معاملة",
     "smsParser": "تحليل الرسائل",
     "logout": "تسجيل الخروج",
+    "statement": "كشف الحساب",
     "cash": "النقد",
     "settings": "الإعدادات"
   },

@@ -71,6 +71,7 @@
     "addTransaction": "Add Transaction",
     "smsParser": "SMS Parser",
     "logout": "Logout",
+    "statement": "Bank Statement",
     "cash": "Cash",
     "settings": "Settings"
   },

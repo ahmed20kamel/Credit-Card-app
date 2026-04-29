@@ -91,6 +91,45 @@ export const cardsAPI = {
     return response.data;
   },
 
+  parseStatement: async (fileBase64: string, fileType: string): Promise<{
+    card_info: {
+      bank_name?: string; card_name?: string; card_last_four?: string;
+      cardholder_name?: string; credit_limit?: number; available_balance?: number;
+      statement_balance?: number; statement_date?: number; payment_due_date?: number;
+      payment_due_full_date?: string; minimum_payment?: number; minimum_payment_percentage?: number;
+      annual_fee?: number; late_payment_fee?: number; over_limit_fee?: number;
+      account_manager_name?: string; account_manager_phone?: string;
+      bank_emails?: string[]; currency?: string;
+      statement_period_from?: string; statement_period_to?: string;
+    };
+    transactions: Array<{
+      date: string; merchant: string; amount: number;
+      type: string; currency: string; category?: string;
+    }>;
+    transaction_count: number;
+    matched_card_id?: string;
+    matched_card_name?: string;
+    error?: string;
+  }> => {
+    const response = await api.post('/cards/parse-statement', { file: fileBase64, file_type: fileType });
+    return response.data;
+  },
+
+  importStatement: async (data: {
+    card_info: Record<string, unknown>;
+    transactions: Array<Record<string, unknown>>;
+    card_id?: string;
+  }): Promise<{
+    card: unknown;
+    card_created: boolean;
+    transactions_created: number;
+    transactions_skipped: number;
+    total_transactions: number;
+  }> => {
+    const response = await api.post('/cards/import-statement', data);
+    return response.data;
+  },
+
   scanCardImage: async (imageBase64: string): Promise<{
     card_number?: string;
     cardholder_name?: string;
