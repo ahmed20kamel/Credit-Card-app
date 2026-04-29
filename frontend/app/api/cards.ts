@@ -91,6 +91,33 @@ export const cardsAPI = {
     return response.data;
   },
 
+  analytics: async (period: 'month' | 'quarter' | 'year' | 'all' = 'all'): Promise<{
+    period: string;
+    date_from: string | null;
+    totals: { purchases: number; payments: number; refunds: number; net_spending: number; net_after_payments: number };
+    by_category: Array<{ category: string; total: number; count: number }>;
+    by_card: Array<{
+      card_id: string; card_name: string; bank_name: string; last_four: string; color_hex: string | null;
+      total_purchases: number; count: number;
+      points_earn_rate: number; points_value_fils: number;
+      points_earned: number; points_value_aed: number;
+    }>;
+    monthly_trend: Array<{ month: string; purchases: number; payments: number; refunds: number }>;
+    upcoming_payments: Array<{
+      card_id: string; card_name: string; bank_name: string; card_last_four: string; color_hex: string | null;
+      current_balance: number; credit_limit: number; minimum_payment: number;
+      due_date: string | null; days_until: number | null; is_overdue: boolean; currency: string;
+    }>;
+    points_summary: { total_earned: number; total_value_aed: number };
+  }> => {
+    const response = await api.get('/cards/analytics', { params: { period } });
+    return response.data;
+  },
+
+  updatePointsRate: async (cardId: string, points_earn_rate: number, points_value_fils: number): Promise<void> => {
+    await api.patch(`/cards/${cardId}`, { points_earn_rate, points_value_fils });
+  },
+
   getBankPasswords: async (): Promise<Array<{ id: string; bank_name: string; updated_at: string }>> => {
     const response = await api.get('/bank-passwords/');
     return response.data;

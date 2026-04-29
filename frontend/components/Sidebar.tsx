@@ -13,6 +13,7 @@ import {
   X,
   Wallet,
   FileText,
+  BarChart3,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslations } from '@/lib/i18n';
@@ -33,6 +34,7 @@ export default function Sidebar({ userEmail, onLogout }: SidebarProps) {
     { href: '/transactions', label: t('navigation.transactions'), icon: Receipt, key: 'transactions' },
     { href: '/sms-parser', label: t('navigation.addTransaction'), icon: Upload, key: 'addTransaction' },
     { href: '/statement', label: t('navigation.statement') || 'كشف الحساب', icon: FileText, key: 'statement' },
+    { href: '/reports', label: 'التقارير', icon: BarChart3, key: 'reports' },
     { href: '/cash', label: t('navigation.cash') || 'Cash', icon: Banknote, key: 'cash' },
     { href: '/settings', label: t('common.settings') || 'Settings', icon: Settings, key: 'settings' },
   ];

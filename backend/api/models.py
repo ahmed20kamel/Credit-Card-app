@@ -130,6 +130,12 @@ class Card(models.Model):
     issue_date = models.DateField(null=True, blank=True)
     classification = models.CharField(max_length=50, choices=CARD_CLASSIFICATIONS, null=True, blank=True)
 
+    # Points & Rewards
+    points_earn_rate = models.FloatField(null=True, blank=True, default=1.0,
+        help_text='Points earned per 1 AED spent')
+    points_value_fils = models.FloatField(null=True, blank=True, default=5.0,
+        help_text='Value of 1 point in fils (5 = 0.005 AED per point)')
+
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

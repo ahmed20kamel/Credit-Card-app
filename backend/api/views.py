@@ -773,6 +773,171 @@ class CardViewSet(viewsets.ModelViewSet):
             })
         return Response({'items': items, 'total_owed': total_owed, 'total_credit_limit': total_limit, 'total_available': total_available, 'currency': 'AED'})
 
+    @action(detail=False, methods=['get'], url_path='analytics', url_name='analytics')
+    def analytics(self, request):
+        """Return comprehensive analytics: spending, payments, points, upcoming dues."""
+        from django.db.models import Sum, Count
+        from django.db.models.functions import TruncMonth
+        from datetime import date, timedelta
+        from calendar import monthrange
+        import logging
+        logger = logging.getLogger('api.audit')
+
+        period = request.query_params.get('period', 'all')
+        today = date.today()
+
+        if period == 'month':
+            date_from = today.replace(day=1)
+        elif period == 'quarter':
+            first_month = ((today.month - 1) // 3) * 3 + 1
+            date_from = today.replace(month=first_month, day=1)
+        elif period == 'year':
+            date_from = today.replace(month=1, day=1)
+        else:
+            date_from = None
+
+        txns = Transaction.objects.filter(user=request.user)
+        if date_from:
+            txns = txns.filter(transaction_date__date__gte=date_from)
+
+        purchase_types = ['purchase', 'withdrawal']
+
+        total_purchases = txns.filter(transaction_type__in=purchase_types).aggregate(t=Sum('amount'))['t'] or 0
+        total_payments  = txns.filter(transaction_type='payment').aggregate(t=Sum('amount'))['t'] or 0
+        total_refunds   = txns.filter(transaction_type='refund').aggregate(t=Sum('amount'))['t'] or 0
+
+        by_category = list(
+            txns.filter(transaction_type__in=purchase_types)
+            .values('category')
+            .annotate(total=Sum('amount'), count=Count('id'))
+            .order_by('-total')[:15]
+        )
+
+        by_card_qs = list(
+            txns.filter(transaction_type__in=purchase_types)
+            .values('card__id', 'card__card_name', 'card__bank_name',
+                    'card__card_last_four', 'card__color_hex',
+                    'card__points_earn_rate', 'card__points_value_fils')
+            .annotate(total=Sum('amount'), count=Count('id'))
+            .order_by('-total')
+        )
+
+        # Monthly trend — always last 12 months regardless of period filter
+        twelve_ago = today.replace(day=1) - timedelta(days=365)
+        monthly_raw = (
+            Transaction.objects.filter(user=request.user, transaction_date__date__gte=twelve_ago)
+            .annotate(month=TruncMonth('transaction_date'))
+            .values('month', 'transaction_type')
+            .annotate(total=Sum('amount'))
+            .order_by('month')
+        )
+        monthly_map: dict = {}
+        for row in monthly_raw:
+            key = row['month'].strftime('%Y-%m')
+            if key not in monthly_map:
+                monthly_map[key] = {'month': key, 'purchases': 0.0, 'payments': 0.0, 'refunds': 0.0}
+            if row['transaction_type'] in purchase_types:
+                monthly_map[key]['purchases'] += float(row['total'])
+            elif row['transaction_type'] == 'payment':
+                monthly_map[key]['payments'] += float(row['total'])
+            elif row['transaction_type'] == 'refund':
+                monthly_map[key]['refunds'] += float(row['total'])
+        monthly = sorted(monthly_map.values(), key=lambda x: x['month'])
+
+        # Upcoming payment due dates
+        credit_cards = Card.objects.filter(user=request.user, card_type__in=['credit', 'covered'])
+        upcoming = []
+        for card in credit_cards:
+            balance = float(card.current_balance or 0)
+            if balance <= 0:
+                continue
+            due_day = card.payment_due_date
+            due_date_str = None
+            days_until = None
+            is_overdue = False
+            if due_day:
+                try:
+                    due_date = today.replace(day=due_day)
+                    if due_date <= today:
+                        if today.month == 12:
+                            due_date = due_date.replace(year=today.year + 1, month=1)
+                        else:
+                            last_day = monthrange(today.year, today.month + 1)[1]
+                            due_date = today.replace(month=today.month + 1, day=min(due_day, last_day))
+                    days_until = (due_date - today).days
+                    due_date_str = due_date.strftime('%Y-%m-%d')
+                    is_overdue = days_until < 0
+                except ValueError:
+                    pass
+            min_pay = 0.0
+            if card.minimum_payment:
+                min_pay = float(card.minimum_payment)
+            elif card.minimum_payment_percentage:
+                min_pay = round(balance * float(card.minimum_payment_percentage) / 100, 2)
+            upcoming.append({
+                'card_id': str(card.id),
+                'card_name': card.card_name,
+                'bank_name': card.bank_name,
+                'card_last_four': card.card_last_four,
+                'color_hex': card.color_hex,
+                'current_balance': balance,
+                'credit_limit': float(card.credit_limit or 0),
+                'minimum_payment': min_pay,
+                'due_date': due_date_str,
+                'days_until': days_until,
+                'is_overdue': is_overdue,
+                'currency': card.balance_currency or 'AED',
+            })
+        upcoming.sort(key=lambda x: (x['days_until'] is None, x['days_until'] if x['days_until'] is not None else 999))
+
+        # Points calculation
+        total_points = 0.0
+        total_points_value = 0.0
+        by_card = []
+        for r in by_card_qs:
+            rate = r.get('card__points_earn_rate') or 1.0
+            fils = r.get('card__points_value_fils') or 5.0
+            pts = float(r['total']) * rate
+            val = pts * fils / 1000
+            total_points += pts
+            total_points_value += val
+            by_card.append({
+                'card_id': str(r['card__id']),
+                'card_name': r['card__card_name'],
+                'bank_name': r['card__bank_name'],
+                'last_four': r['card__card_last_four'],
+                'color_hex': r['card__color_hex'],
+                'total_purchases': float(r['total']),
+                'count': r['count'],
+                'points_earn_rate': rate,
+                'points_value_fils': fils,
+                'points_earned': round(pts),
+                'points_value_aed': round(val, 2),
+            })
+
+        return Response({
+            'period': period,
+            'date_from': date_from.isoformat() if date_from else None,
+            'totals': {
+                'purchases': float(total_purchases),
+                'payments': float(total_payments),
+                'refunds': float(total_refunds),
+                'net_spending': float(total_purchases) - float(total_refunds),
+                'net_after_payments': float(total_purchases) - float(total_refunds) - float(total_payments),
+            },
+            'by_category': [
+                {'category': r['category'] or 'أخرى', 'total': float(r['total']), 'count': r['count']}
+                for r in by_category
+            ],
+            'by_card': by_card,
+            'monthly_trend': monthly,
+            'upcoming_payments': upcoming,
+            'points_summary': {
+                'total_earned': round(total_points),
+                'total_value_aed': round(total_points_value, 2),
+            },
+        })
+
     def _decrypt_pdf(self, pdf_bytes: bytes, password: str) -> bytes:
         """Decrypt a password-protected PDF using pikepdf. Returns decrypted bytes."""
         import io

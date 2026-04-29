@@ -46,6 +46,7 @@ class CardSerializer(serializers.ModelSerializer):
             'fee_due_date', 'renewal_type', 'has_waiver_condition', 'waiver_condition',
             'card_replacement_fee', 'account_manager_name', 'account_manager_phone', 'bank_emails',
             'issue_date', 'classification',
+            'points_earn_rate', 'points_value_fils',
             'created_at', 'updated_at',
             'card_number', 'cardholder_name', 'cvv', 'iban'
         ]
