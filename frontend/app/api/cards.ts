@@ -91,9 +91,16 @@ export const cardsAPI = {
     return response.data;
   },
 
-  analytics: async (period: 'month' | 'quarter' | 'year' | 'all' = 'all'): Promise<{
+  analytics: async (params?: {
+    period?: 'month' | 'quarter' | 'year' | 'all' | 'custom';
+    from_date?: string;
+    to_date?: string;
+    card_id?: string;
+    category?: string;
+  }): Promise<{
     period: string;
     date_from: string | null;
+    date_to: string | null;
     totals: { purchases: number; payments: number; refunds: number; net_spending: number; net_after_payments: number };
     by_category: Array<{ category: string; total: number; count: number }>;
     by_card: Array<{
@@ -110,7 +117,7 @@ export const cardsAPI = {
     }>;
     points_summary: { total_earned: number; total_value_aed: number };
   }> => {
-    const response = await api.get('/cards/analytics', { params: { period } });
+    const response = await api.get('/cards/analytics', { params: params || {} });
     return response.data;
   },
 

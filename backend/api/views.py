@@ -784,9 +784,20 @@ class CardViewSet(viewsets.ModelViewSet):
         logger = logging.getLogger('api.audit')
 
         period = request.query_params.get('period', 'all')
+        custom_from = request.query_params.get('from_date')
+        custom_to = request.query_params.get('to_date')
+        card_id_filter = request.query_params.get('card_id')
+        category_filter = request.query_params.get('category')
         today = date.today()
 
-        if period == 'month':
+        if custom_from:
+            try:
+                from datetime import datetime as _dt
+                date_from = _dt.strptime(custom_from, '%Y-%m-%d').date()
+                period = 'custom'
+            except ValueError:
+                date_from = None
+        elif period == 'month':
             date_from = today.replace(day=1)
         elif period == 'quarter':
             first_month = ((today.month - 1) // 3) * 3 + 1
@@ -796,9 +807,23 @@ class CardViewSet(viewsets.ModelViewSet):
         else:
             date_from = None
 
+        date_to = None
+        if custom_to:
+            try:
+                from datetime import datetime as _dt
+                date_to = _dt.strptime(custom_to, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
         txns = Transaction.objects.filter(user=request.user)
         if date_from:
             txns = txns.filter(transaction_date__date__gte=date_from)
+        if date_to:
+            txns = txns.filter(transaction_date__date__lte=date_to)
+        if card_id_filter:
+            txns = txns.filter(card_id=card_id_filter)
+        if category_filter:
+            txns = txns.filter(category__iexact=category_filter)
 
         purchase_types = ['purchase', 'withdrawal']
 
@@ -918,6 +943,7 @@ class CardViewSet(viewsets.ModelViewSet):
         return Response({
             'period': period,
             'date_from': date_from.isoformat() if date_from else None,
+            'date_to': date_to.isoformat() if date_to else None,
             'totals': {
                 'purchases': float(total_purchases),
                 'payments': float(total_payments),
@@ -1687,6 +1713,7 @@ def chat_send(request):
     cards_context = []
     for card in user_cards:
         card_info = {
+            'id': str(card.id),
             'name': card.card_name, 'bank': card.bank_name,
             'type': card.card_type, 'last_four': card.card_last_four,
             'network': card.card_network,
@@ -1779,11 +1806,38 @@ When the user asks to add/save a new card:
 - payment_due_date: day of month (1-31), or omit if unknown
 - credit_limit and current_balance: numbers, omit if debit/prepaid
 
+### UPDATE CARD
+When user asks to update/edit any card field (balance, name, limit, due date, etc.):
+[ACTION:UPDATE_CARD]
+{{"card_id": "<id from cards list>", "card_name": "...", "current_balance": 5000, "credit_limit": 15000, "payment_due_date": 15, "available_balance": 10000}}
+[/ACTION]
+- card_id: use the id from the cards list above
+- Only include the fields that need to change
+- For balance: current_balance = outstanding amount owed
+- For available: available_balance = remaining spending power
+
+### DELETE CARD
+When user asks to delete/remove a card permanently:
+[ACTION:DELETE_CARD]
+{{"card_id": "<id from cards list>"}}
+[/ACTION]
+- This soft-deletes the card (data is kept for history)
+
+### MERGE CARDS
+When user says two cards are the same card (replacement, same account), merge all transactions from old to new then delete old:
+[ACTION:MERGE_CARDS]
+{{"source_card_id": "<old card id to delete>", "target_card_id": "<new/keep card id>", "delete_source": true}}
+[/ACTION]
+- Moves ALL transactions from source to target
+- Then soft-deletes the source card
+- Use this when user says card was replaced/renewed
+
 Rules:
 - You CAN and SHOULD perform these actions when asked
 - Always confirm what you did in your message text above the action block
-- NEVER say you can't add transactions or cards - you CAN using the action blocks above
-- You can include multiple action blocks in one response if needed"""
+- NEVER say you can't edit/delete/merge cards - you CAN using the action blocks above
+- You can include multiple action blocks in one response if needed
+- When merging cards, always confirm which is old and which is new before acting"""
 
     ai_response = None
     google_key = getattr(django_settings, 'GOOGLE_API_KEY', '')
@@ -1963,6 +2017,87 @@ Rules:
                 })
             except (json.JSONDecodeError, Exception) as e:
                 logger.warning('Chat ADD_CARD error: %s', str(e))
+
+    # Process UPDATE_CARD actions
+    if '[ACTION:UPDATE_CARD]' in ai_response:
+        action_pattern = r'\[ACTION:UPDATE_CARD\]\s*(\{.*?\})\s*\[/ACTION\]'
+        matches = re.findall(action_pattern, ai_response, re.DOTALL)
+        for match in matches:
+            try:
+                data = json.loads(match)
+                card_id = data.pop('card_id', None)
+                if not card_id:
+                    continue
+                card_obj = Card.objects.filter(id=card_id, user=request.user).first()
+                if not card_obj:
+                    continue
+                allowed_fields = [
+                    'card_name', 'bank_name', 'credit_limit', 'current_balance',
+                    'available_balance', 'payment_due_date', 'statement_date',
+                    'minimum_payment', 'minimum_payment_percentage', 'notes',
+                    'color_hex', 'annual_fee', 'late_payment_fee',
+                ]
+                updated = []
+                for field in allowed_fields:
+                    if field in data:
+                        val = data[field]
+                        if field in ('credit_limit', 'current_balance', 'available_balance',
+                                     'minimum_payment', 'minimum_payment_percentage',
+                                     'annual_fee', 'late_payment_fee') and val is not None:
+                            val = Decimal(str(val))
+                        setattr(card_obj, field, val)
+                        updated.append(field)
+                if updated:
+                    card_obj.save(update_fields=updated)
+                    actions_performed.append({'type': 'card_updated', 'card_id': card_id, 'fields': updated})
+            except Exception as e:
+                logger.warning('Chat UPDATE_CARD error: %s', str(e))
+
+    # Process DELETE_CARD actions
+    if '[ACTION:DELETE_CARD]' in ai_response:
+        action_pattern = r'\[ACTION:DELETE_CARD\]\s*(\{.*?\})\s*\[/ACTION\]'
+        matches = re.findall(action_pattern, ai_response, re.DOTALL)
+        for match in matches:
+            try:
+                data = json.loads(match)
+                card_id = data.get('card_id')
+                if not card_id:
+                    continue
+                card_obj = Card.objects.filter(id=card_id, user=request.user).first()
+                if card_obj:
+                    card_obj.is_deleted = True
+                    card_obj.save(update_fields=['is_deleted'])
+                    actions_performed.append({'type': 'card_deleted', 'card_id': card_id, 'card_name': card_obj.card_name})
+            except Exception as e:
+                logger.warning('Chat DELETE_CARD error: %s', str(e))
+
+    # Process MERGE_CARDS actions
+    if '[ACTION:MERGE_CARDS]' in ai_response:
+        action_pattern = r'\[ACTION:MERGE_CARDS\]\s*(\{.*?\})\s*\[/ACTION\]'
+        matches = re.findall(action_pattern, ai_response, re.DOTALL)
+        for match in matches:
+            try:
+                data = json.loads(match)
+                source_id = data.get('source_card_id')
+                target_id = data.get('target_card_id')
+                if not source_id or not target_id or source_id == target_id:
+                    continue
+                source = Card.objects.filter(id=source_id, user=request.user).first()
+                target = Card.objects.filter(id=target_id, user=request.user).first()
+                if not source or not target:
+                    continue
+                moved = Transaction.objects.filter(card_id=source_id, user=request.user).update(card_id=target_id)
+                if data.get('delete_source', True):
+                    source.is_deleted = True
+                    source.save(update_fields=['is_deleted'])
+                actions_performed.append({
+                    'type': 'cards_merged',
+                    'source_card': source.card_name,
+                    'target_card': target.card_name,
+                    'transactions_moved': moved,
+                })
+            except Exception as e:
+                logger.warning('Chat MERGE_CARDS error: %s', str(e))
 
     # Strip all action blocks from the display response
     display_response = re.sub(r'\[ACTION:[A-Z_]+\].*?\[/ACTION\]', '', ai_response, flags=re.DOTALL).strip()
