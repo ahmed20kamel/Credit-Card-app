@@ -52,9 +52,10 @@ class AllObjectsManager(models.Manager):
 
 
 class Card(models.Model):
-    CARD_TYPES = [('credit', 'Credit'), ('debit', 'Debit'), ('prepaid', 'Prepaid')]
+    CARD_TYPES = [('credit', 'Credit'), ('debit', 'Debit'), ('prepaid', 'Prepaid'), ('covered', 'Covered')]
     CARD_CATEGORIES = [
         ('classic', 'Classic'),
+        ('silver', 'Silver'),
         ('gold', 'Gold'),
         ('platinum', 'Platinum'),
         ('signature', 'Signature'),
@@ -68,6 +69,12 @@ class Card(models.Model):
         ('primary', 'Primary'),
         ('supplementary', 'Supplementary'),
         ('joint', 'Joint'),
+    ]
+    CARD_CLASSIFICATIONS = [
+        ('personal', 'Personal'),
+        ('travel', 'Travel'),
+        ('business', 'Business'),
+        ('rewards', 'Rewards'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -120,6 +127,8 @@ class Card(models.Model):
     account_manager_name = models.CharField(max_length=255, null=True, blank=True)
     account_manager_phone = models.CharField(max_length=50, null=True, blank=True)
     bank_emails = models.TextField(null=True, blank=True, help_text='JSON array of bank email addresses')
+    issue_date = models.DateField(null=True, blank=True)
+    classification = models.CharField(max_length=50, choices=CARD_CLASSIFICATIONS, null=True, blank=True)
 
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

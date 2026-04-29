@@ -39,7 +39,7 @@ export interface RegisterRequest {
 }
 
 // ========== Card Types ==========
-export type CardType = 'credit' | 'debit' | 'prepaid';
+export type CardType = 'credit' | 'debit' | 'prepaid' | 'covered';
 export type CardNetwork = 'visa' | 'mastercard' | 'amex' | 'discover';
 
 export interface Card {
@@ -79,6 +79,8 @@ export interface Card {
   account_manager_phone?: string;
   bank_emails?: string;
   card_benefits?: string;
+  issue_date?: string;
+  classification?: string;
   created_at: string;
   updated_at: string;
   // Revealed fields (only when reveal=true)
@@ -110,6 +112,8 @@ export interface CardCreateRequest {
   credit_limit?: number | null;
   current_balance?: number | null;
   card_benefits?: string;
+  issue_date?: string;
+  classification?: string;
 }
 
 export interface CardUpdateRequest {

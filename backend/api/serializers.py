@@ -45,6 +45,7 @@ class CardSerializer(serializers.ModelSerializer):
             'late_payment_fee', 'over_limit_fee', 'supplementary_card_fee', 'annual_fee',
             'fee_due_date', 'renewal_type', 'has_waiver_condition', 'waiver_condition',
             'card_replacement_fee', 'account_manager_name', 'account_manager_phone', 'bank_emails',
+            'issue_date', 'classification',
             'created_at', 'updated_at',
             'card_number', 'cardholder_name', 'cvv', 'iban'
         ]
@@ -176,6 +177,7 @@ class CardUpdateSerializer(serializers.ModelSerializer):
             'late_payment_fee', 'over_limit_fee', 'supplementary_card_fee', 'annual_fee',
             'fee_due_date', 'renewal_type', 'has_waiver_condition', 'waiver_condition',
             'card_replacement_fee', 'account_manager_name', 'account_manager_phone', 'bank_emails',
+            'issue_date', 'classification',
             'card_number', 'cardholder_name', 'cvv', 'iban'
         ]
     

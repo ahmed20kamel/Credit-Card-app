@@ -70,6 +70,8 @@ function NewCardContent() {
     account_manager_name: '',
     account_manager_phone: '',
     card_benefits: [] as string[],
+    issue_date: '',
+    classification: '',
   });
 
   useEffect(() => {
@@ -236,6 +238,8 @@ function NewCardContent() {
         has_waiver_condition: formData.has_waiver_condition,
         waiver_condition: formData.has_waiver_condition ? (formData.waiver_condition || undefined) : undefined,
         card_replacement_fee: num(formData.card_replacement_fee) ?? undefined,
+        issue_date: formData.issue_date || undefined,
+        classification: formData.classification || undefined,
         account_manager_name: formData.account_manager_name || undefined,
         account_manager_phone: formData.account_manager_phone || undefined,
         bank_emails: bankEmails.length > 0 ? JSON.stringify(bankEmails) : undefined,
@@ -418,8 +422,8 @@ function NewCardContent() {
                       required
                       value={formData.card_type}
                       onChange={(v) => setFormData({ ...formData, card_type: v })}
-                      options={[t('cards.credit'), t('cards.debit'), t('cards.prepaid')]}
-                      optionValues={['credit', 'debit', 'prepaid']}
+                      options={[t('cards.credit'), t('cards.debit'), t('cards.prepaid'), 'Covered — مغطاة']}
+                      optionValues={['credit', 'debit', 'prepaid', 'covered']}
                       placeholder={t('common.search')}
                       noMatchesText={t('common.noMatches')}
                       creatable
@@ -436,6 +440,7 @@ function NewCardContent() {
                       options={[
                         t('common.none') || 'None',
                         t('cards.category_classic'),
+                        'Silver — فضية',
                         t('cards.category_gold'),
                         t('cards.category_platinum'),
                         t('cards.category_signature'),
@@ -445,7 +450,7 @@ function NewCardContent() {
                         t('cards.category_world'),
                         t('cards.category_world_elite'),
                       ]}
-                      optionValues={['', 'classic', 'gold', 'platinum', 'signature', 'infinite', 'titanium', 'business', 'world', 'world_elite']}
+                      optionValues={['', 'classic', 'silver', 'gold', 'platinum', 'signature', 'infinite', 'titanium', 'business', 'world', 'world_elite']}
                       placeholder={t('common.search')}
                       noMatchesText={t('common.noMatches')}
                       creatable
@@ -475,6 +480,21 @@ function NewCardContent() {
                   </div>
 
                   <div className="form-group">
+                    <label>{t('cards.classification') || 'Classification'}</label>
+                    <SearchableSelect
+                      value={formData.classification}
+                      onChange={(v) => setFormData({ ...formData, classification: v })}
+                      options={[t('common.none') || 'None', 'Personal — شخصية', 'Travel — سفر', 'Business — عمل', 'Rewards — مكافآت']}
+                      optionValues={['', 'personal', 'travel', 'business', 'rewards']}
+                      placeholder={t('common.search')}
+                      noMatchesText={t('common.noMatches')}
+                      creatable
+                      createText={t('common.add') || 'Add'}
+                      aria-label="Classification"
+                    />
+                  </div>
+
+                  <div className="form-group">
                     <label>{t('cards.cardNetwork') || 'Card Network'}</label>
                     <SearchableSelect
                       value={formData.card_network}
@@ -488,6 +508,18 @@ function NewCardContent() {
                       aria-label={t('cards.cardNetwork')}
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Issue Date */}
+              <div className="form-section">
+                <div className="form-group">
+                  <label>{t('cards.issueDate') || 'Issue Date'}</label>
+                  <input
+                    type="date"
+                    value={formData.issue_date}
+                    onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
+                  />
                 </div>
               </div>
 
