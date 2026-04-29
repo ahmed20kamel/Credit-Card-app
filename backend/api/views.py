@@ -326,8 +326,35 @@ class CardViewSet(viewsets.ModelViewSet):
 
         response_text = None
 
-        # ── Try Google Gemini first (with retry for 429) ─────
-        if google_key:
+        # ── Try Anthropic Claude first (more accurate for card OCR) ──
+        if anthropic_key:
+            try:
+                import anthropic
+                client = anthropic.Anthropic(api_key=anthropic_key)
+                for model_name in ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-5-sonnet-latest']:
+                    try:
+                        message = client.messages.create(
+                            model=model_name, max_tokens=1024,
+                            messages=[{'role': 'user', 'content': [
+                                {'type': 'image', 'source': {'type': 'base64', 'media_type': media_type, 'data': image_data}},
+                                {'type': 'text', 'text': claude_prompt}
+                            ]}]
+                        )
+                        text = message.content[0].text.strip()
+                        if text.startswith('{') or '```' in text:
+                            response_text = text
+                            logger.info('Card scan: Claude %s success user=%s', model_name, request.user.email)
+                            break
+                        else:
+                            logger.warning('Card scan: Claude %s refused, trying next model', model_name)
+                            continue
+                    except Exception:
+                        continue
+            except Exception as e:
+                logger.warning('Card scan: Anthropic error: %s', str(e))
+
+        # ── Fallback to Google Gemini ─────────────────────────
+        if not response_text and google_key:
             gemini_url = (
                 'https://generativelanguage.googleapis.com/v1beta/'
                 'models/gemini-2.0-flash:generateContent'
@@ -358,10 +385,10 @@ class CardViewSet(viewsets.ModelViewSet):
                             if parts:
                                 response_text = parts[0].get('text', '').strip()
                                 logger.info('Card scan: Gemini success (attempt %d) user=%s', attempt + 1, request.user.email)
-                    break  # Success or empty response, don't retry
+                    break
                 except urllib.error.HTTPError as e:
                     if e.code == 429 and attempt < 2:
-                        wait = (attempt + 1) * 2  # 2s, 4s
+                        wait = (attempt + 1) * 2
                         logger.info('Card scan: Gemini 429, retrying in %ds...', wait)
                         time.sleep(wait)
                         continue
@@ -370,34 +397,6 @@ class CardViewSet(viewsets.ModelViewSet):
                 except Exception as e:
                     logger.warning('Card scan: Gemini error (attempt %d): %s', attempt + 1, str(e))
                     break
-
-        # ── Fallback to Anthropic Claude ─────────────────────
-        if not response_text and anthropic_key:
-            try:
-                import anthropic
-                client = anthropic.Anthropic(api_key=anthropic_key)
-                for model_name in ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-5-sonnet-latest']:
-                    try:
-                        message = client.messages.create(
-                            model=model_name, max_tokens=1024,
-                            messages=[{'role': 'user', 'content': [
-                                {'type': 'image', 'source': {'type': 'base64', 'media_type': media_type, 'data': image_data}},
-                                {'type': 'text', 'text': claude_prompt}
-                            ]}]
-                        )
-                        text = message.content[0].text.strip()
-                        # Check if Claude refused (no JSON = refusal)
-                        if text.startswith('{') or '```' in text:
-                            response_text = text
-                            logger.info('Card scan: Claude %s success user=%s', model_name, request.user.email)
-                            break
-                        else:
-                            logger.warning('Card scan: Claude %s refused, trying next model', model_name)
-                            continue
-                    except Exception:
-                        continue
-            except Exception as e:
-                logger.warning('Card scan: Anthropic error: %s', str(e))
 
         if not response_text:
             return Response(
