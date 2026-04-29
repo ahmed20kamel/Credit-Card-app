@@ -1810,16 +1810,12 @@ def chat_send(request):
                 pass
         cards_context.append(card_info)
 
-    # Recent 60 transactions for detailed context
-    recent_txns = all_txns_qs.select_related('card').order_by('-transaction_date')[:60]
-    txn_context = [{
-        'type': t.transaction_type, 'amount': float(t.amount),
-        'currency': t.currency, 'merchant': t.merchant_name,
-        'date': t.transaction_date.strftime('%Y-%m-%d') if t.transaction_date else None,
-        'card': t.card.card_name if t.card else 'Cash',
-        'card_last_four': t.card.card_last_four if t.card else None,
-        'category': t.category,
-    } for t in recent_txns]
+    # ALL transactions — compact format to stay within context limits
+    all_txns_list = all_txns_qs.select_related('card').order_by('-transaction_date')
+    txn_context = [
+        f"{t.transaction_date.strftime('%Y-%m-%d') if t.transaction_date else '?'}|{t.transaction_type}|{float(t.amount):.2f}|{t.currency}|{t.merchant_name or ''}|{t.card.card_name if t.card else 'Cash'}|{t.card.card_last_four if t.card else ''}|{t.category or ''}"
+        for t in all_txns_list
+    ]
 
     # Cash balance
     cash_qs = CashEntry.objects.filter(user=request.user, is_deleted=False)
@@ -1850,8 +1846,8 @@ def chat_send(request):
 - Top categories (all time): {json.dumps([{'category': r['category'] or 'Other', 'total': float(r['total']), 'count': r['cnt']} for r in category_totals], default=str)}
 - Monthly trend (last 6 months): {json.dumps(sorted(monthly_map.values(), key=lambda x: x['month']), default=str)}
 
-## Most Recent 60 Transactions (for detailed reference):
-{json.dumps(txn_context, ensure_ascii=False, default=str)}
+## ALL {total_count} Transactions (format: date|type|amount|currency|merchant|card|last4|category):
+{chr(10).join(txn_context)}
 
 ## Cash Balance: {cash_balance} AED
 
