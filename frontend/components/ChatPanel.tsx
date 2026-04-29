@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useChatStore } from '@/app/store/chatStore';
+import { cardsAPI } from '@/app/api/cards';
 import { useTranslations } from '@/lib/i18n';
 import {
   MessageCircle, X, Send, Plus, Bot, User as UserIcon, Clock, Trash2,
@@ -34,8 +35,9 @@ export default function ChatPanel() {
   const [voiceMode, setVoiceMode] = useState(false);
   const lastSpokenMsgCount = useRef(0);
 
-  // Image attachment
+  // File/image attachment
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [attachedFile, setAttachedFile] = useState<{ base64: string; type: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Init ──────────────────────────────────────────────────────────────
@@ -206,22 +208,38 @@ export default function ChatPanel() {
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
+    if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setImagePreview(reader.result as string);
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      if (file.type.startsWith('image/')) setImagePreview(base64);
+      setAttachedFile({ base64, type: file.type, name: file.name });
+    };
     reader.readAsDataURL(file);
     e.target.value = '';
   }, []);
 
-  const removeImagePreview = useCallback(() => setImagePreview(null), []);
+  const removeImagePreview = useCallback(() => { setImagePreview(null); setAttachedFile(null); }, []);
 
   // ── Send ──────────────────────────────────────────────────────────────
-  const handleSend = () => {
-    if ((!input.trim() && !imagePreview) || isSending) return;
-    const text = input.trim() || (imagePreview ? (t('chat.imageAttached') || 'Image attached') : '');
+  const handleSend = async () => {
+    if ((!input.trim() && !imagePreview && !attachedFile) || isSending) return;
+    const text = input.trim() || (imagePreview ? (t('chat.imageAttached') || 'Image attached') : attachedFile ? `مرفق: ${attachedFile.name}` : '');
     sendMessage(text, imagePreview || undefined);
     setInput('');
+    const fileToExtract = attachedFile;
     setImagePreview(null);
+    setAttachedFile(null);
+    if (fileToExtract) {
+      try {
+        const result = await cardsAPI.extractDocument(fileToExtract.base64, fileToExtract.type);
+        if (!result.error) {
+          window.dispatchEvent(new CustomEvent('cardDataExtracted', { detail: result }));
+        }
+      } catch {
+        // silent — chat message already sent
+      }
+    }
   };
 
   // ── Helpers ───────────────────────────────────────────────────────────
@@ -384,11 +402,18 @@ export default function ChatPanel() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ── Image Preview ── */}
-          {imagePreview && (
+          {/* ── File/Image Preview ── */}
+          {(imagePreview || attachedFile) && (
             <div className="chat-image-preview">
-              <img src={imagePreview} alt="Attached" />
-              <button className="chat-image-preview-remove" onClick={removeImagePreview} type="button" aria-label="Remove image">
+              {imagePreview ? (
+                <img src={imagePreview} alt="Attached" />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', fontSize: '0.8rem' }}>
+                  <Paperclip size={14} />
+                  <span style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachedFile?.name}</span>
+                </div>
+              )}
+              <button className="chat-image-preview-remove" onClick={removeImagePreview} type="button" aria-label="Remove attachment">
                 <X size={14} />
               </button>
             </div>
@@ -396,7 +421,7 @@ export default function ChatPanel() {
 
           {/* ── Input Area ── */}
           <div className={`chat-input-area ${voiceMode ? 'voice-mode' : ''}`}>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+            <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleFileChange} style={{ display: 'none' }} />
 
             {voiceMode ? (
               /* ── Voice Mode: Big centered mic ── */
@@ -456,7 +481,7 @@ export default function ChatPanel() {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={isSending || (!input.trim() && !imagePreview)}
+                  disabled={isSending || (!input.trim() && !imagePreview && !attachedFile)}
                   className="chat-send-btn"
                   type="button"
                 >

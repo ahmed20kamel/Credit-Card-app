@@ -15,6 +15,8 @@ import { UAE_BANKS } from '@/lib/uae-banks';
 import { getErrorMessage } from '@/lib/errors';
 import FormattedNumberInput from '@/components/ui/FormattedNumberInput';
 
+type ExtractResult = Awaited<ReturnType<typeof cardsAPI.extractDocument>>;
+
 function NewCardContent() {
   const router = useRouter();
   const { isAuthenticated, loadUser } = useAuthStore();
@@ -40,6 +42,8 @@ function NewCardContent() {
   const [bankEmails, setBankEmails] = useState<string[]>([]);
   const [benefits, setBenefits] = useState<{ description: string; count: string; notes: string }[]>([]);
   const [extracting, setExtracting] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadedFilePreview, setUploadedFilePreview] = useState<string | null>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     card_name: '',
@@ -193,10 +197,61 @@ function NewCardContent() {
     setBenefitInput({ description: '', count: '', notes: '' });
   };
 
+  const applyExtractedData = useCallback((result: ExtractResult) => {
+    const updates: Record<string, string> = {};
+    if (result.card_name) updates.card_name = result.card_name;
+    if (result.bank_name) updates.bank_name = result.bank_name;
+    if (result.card_network) updates.card_network = result.card_network;
+    if (result.credit_limit) updates.credit_limit = result.credit_limit;
+    if (result.annual_fee) updates.annual_fee = result.annual_fee;
+    if (result.late_payment_fee) updates.late_payment_fee = result.late_payment_fee;
+    if (result.over_limit_fee) updates.over_limit_fee = result.over_limit_fee;
+    if (result.minimum_payment_percentage) updates.minimum_payment_percentage = result.minimum_payment_percentage;
+    if (result.statement_date) updates.statement_date = result.statement_date;
+    if (result.payment_due_date) updates.payment_due_date = result.payment_due_date;
+    if (result.account_manager_name) updates.account_manager_name = result.account_manager_name;
+    if (result.account_manager_phone) updates.account_manager_phone = result.account_manager_phone;
+    if (Object.keys(updates).length > 0) setFormData(prev => ({ ...prev, ...updates }));
+
+    if (result.card_number || result.cardholder_name || result.expiry_month || result.expiry_year) {
+      setCreditCard(prev => ({
+        ...prev,
+        ...(result.card_number ? { cardNumber: result.card_number!.replace(/(\d{4})/g, '$1 ').trim() } : {}),
+        ...(result.cardholder_name ? { cardholderName: result.cardholder_name } : {}),
+        ...(result.expiry_month ? { expiryMonth: result.expiry_month!.padStart(2, '0') } : {}),
+        ...(result.expiry_year ? { expiryYear: result.expiry_year!.length === 4 ? result.expiry_year!.slice(2) : result.expiry_year } : {}),
+      }));
+    }
+
+    if (result.bank_emails?.length) setBankEmails(prev => [...prev, ...result.bank_emails!].filter((v, i, a) => a.indexOf(v) === i));
+
+    if (result.benefits?.length) {
+      setBenefits(prev => [...prev, ...result.benefits!.map(b => ({
+        description: b.description,
+        count: b.count ?? '',
+        notes: b.notes ?? '',
+      }))]);
+    }
+
+    const totalFields = Object.keys(updates).length + (result.benefits?.length ?? 0);
+    toast.success(`تم استخراج ${totalFields} حقل`);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const result = (e as CustomEvent).detail as ExtractResult;
+      if (result && !result.error) applyExtractedData(result);
+    };
+    window.addEventListener('cardDataExtracted', handler);
+    return () => window.removeEventListener('cardDataExtracted', handler);
+  }, [applyExtractedData]);
+
   const handleDocumentExtract = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    setUploadedFileName(null);
+    setUploadedFilePreview(null);
     setExtracting(true);
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -207,47 +262,9 @@ function NewCardContent() {
       });
       const result = await cardsAPI.extractDocument(dataUrl, file.type);
       if (result.error) { toast.error(result.error); return; }
-
-      // Fill form fields from extracted data
-      const updates: Record<string, string> = {};
-      if (result.card_name) updates.card_name = result.card_name;
-      if (result.bank_name) updates.bank_name = result.bank_name;
-      if (result.credit_limit) updates.credit_limit = result.credit_limit;
-      if (result.annual_fee) updates.annual_fee = result.annual_fee;
-      if (result.late_payment_fee) updates.late_payment_fee = result.late_payment_fee;
-      if (result.over_limit_fee) updates.over_limit_fee = result.over_limit_fee;
-      if (result.minimum_payment_percentage) updates.minimum_payment_percentage = result.minimum_payment_percentage;
-      if (result.statement_date) updates.statement_date = result.statement_date;
-      if (result.payment_due_date) updates.payment_due_date = result.payment_due_date;
-      if (result.account_manager_name) updates.account_manager_name = result.account_manager_name;
-      if (result.account_manager_phone) updates.account_manager_phone = result.account_manager_phone;
-      if (Object.keys(updates).length > 0) setFormData(prev => ({ ...prev, ...updates }));
-
-      // Fill card number fields
-      if (result.card_number || result.cardholder_name || result.expiry_month || result.expiry_year) {
-        setCreditCard(prev => ({
-          ...prev,
-          ...(result.card_number ? { cardNumber: result.card_number.replace(/(\d{4})/g, '$1 ').trim() } : {}),
-          ...(result.cardholder_name ? { cardholderName: result.cardholder_name } : {}),
-          ...(result.expiry_month ? { expiryMonth: result.expiry_month.padStart(2, '0') } : {}),
-          ...(result.expiry_year ? { expiryYear: result.expiry_year.length === 4 ? result.expiry_year.slice(2) : result.expiry_year } : {}),
-        }));
-      }
-
-      // Fill emails
-      if (result.bank_emails?.length) setBankEmails(prev => [...prev, ...result.bank_emails!].filter((v, i, a) => a.indexOf(v) === i));
-
-      // Fill benefits
-      if (result.benefits?.length) {
-        setBenefits(prev => [...prev, ...result.benefits!.map(b => ({
-          description: b.description,
-          count: b.count ?? '',
-          notes: b.notes ?? '',
-        }))]);
-      }
-
-      const totalFields = Object.keys(updates).length + (result.benefits?.length ?? 0);
-      toast.success(`تم استخراج ${totalFields} حقل من الملف`);
+      setUploadedFileName(file.name);
+      if (file.type.startsWith('image/')) setUploadedFilePreview(dataUrl);
+      applyExtractedData(result);
     } catch {
       toast.error('فشل تحليل الملف، جرب مرة أخرى');
     } finally {
@@ -876,6 +893,24 @@ function NewCardContent() {
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #888)' }}>{'PDF, JPG, PNG — حتى 20MB'}</span>
                 </div>
                 <input ref={docInputRef} type="file" accept="image/*,.pdf" onChange={handleDocumentExtract} style={{ display: 'none' }} />
+                {uploadedFileName && (
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--bg-secondary,#f5f5f5)', borderRadius: '10px', border: '1px solid var(--border-color,#e0e0e0)' }}>
+                    {uploadedFilePreview ? (
+                      <img src={uploadedFilePreview} alt={uploadedFileName} style={{ width: '72px', height: '52px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color,#e0e0e0)', flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: '72px', height: '52px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--primary-light,#e8f4ff)', borderRadius: '6px', flexShrink: 0 }}>
+                        <FileText size={24} />
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploadedFileName}</p>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted,#888)', margin: '2px 0 0' }}>{'تم التحليل بنجاح ✓'}</p>
+                    </div>
+                    <button type="button" onClick={() => { setUploadedFileName(null); setUploadedFilePreview(null); }} style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted,#888)', flexShrink: 0 }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Benefits */}
