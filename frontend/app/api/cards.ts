@@ -91,7 +91,24 @@ export const cardsAPI = {
     return response.data;
   },
 
-  parseStatement: async (fileBase64: string, fileType: string): Promise<{
+  getBankPasswords: async (): Promise<Array<{ id: string; bank_name: string; updated_at: string }>> => {
+    const response = await api.get('/bank-passwords/');
+    return response.data;
+  },
+
+  saveBankPassword: async (bankName: string, password: string): Promise<void> => {
+    await api.post('/bank-passwords/save/', { bank_name: bankName, password });
+  },
+
+  deleteBankPassword: async (bankName: string): Promise<void> => {
+    await api.delete(`/bank-passwords/${encodeURIComponent(bankName)}/`);
+  },
+
+  parseStatement: async (fileBase64: string, fileType: string, options?: {
+    pdf_password?: string;
+    save_password?: boolean;
+    bank_name_hint?: string;
+  }): Promise<{
     card_info: {
       bank_name?: string; card_name?: string; card_last_four?: string;
       cardholder_name?: string; credit_limit?: number; available_balance?: number;
@@ -109,9 +126,16 @@ export const cardsAPI = {
     transaction_count: number;
     matched_card_id?: string;
     matched_card_name?: string;
+    password_saved?: boolean;
     error?: string;
   }> => {
-    const response = await api.post('/cards/parse-statement', { file: fileBase64, file_type: fileType });
+    const response = await api.post('/cards/parse-statement', {
+      file: fileBase64,
+      file_type: fileType,
+      pdf_password: options?.pdf_password,
+      save_password: options?.save_password,
+      bank_name_hint: options?.bank_name_hint,
+    });
     return response.data;
   },
 

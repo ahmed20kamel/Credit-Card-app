@@ -230,6 +230,23 @@ class ChatMessage(models.Model):
         ordering = ['created_at']
 
 
+class BankPassword(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bank_passwords')
+    bank_name = models.CharField(max_length=100)
+    password_encrypted = models.BinaryField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'bank_passwords'
+        unique_together = [('user', 'bank_name')]
+        indexes = [models.Index(fields=['user_id'])]
+
+    def __str__(self):
+        return f'{self.user.email} - {self.bank_name}'
+
+
 class WebAuthnCredential(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='webauthn_credentials')

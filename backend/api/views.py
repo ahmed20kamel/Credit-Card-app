@@ -14,7 +14,7 @@ from django.db.models import Sum, Q, Count
 from django.http import HttpResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Card, Transaction, CashEntry, ChatSession, ChatMessage, WebAuthnCredential
+from .models import Card, Transaction, CashEntry, ChatSession, ChatMessage, WebAuthnCredential, BankPassword
 from .serializers import (
     UserSerializer, RegisterSerializer, CardSerializer, CardUpdateSerializer,
     TransactionSerializer, CashEntrySerializer, ChatSessionSerializer, ChatMessageSerializer
@@ -773,6 +773,18 @@ class CardViewSet(viewsets.ModelViewSet):
             })
         return Response({'items': items, 'total_owed': total_owed, 'total_credit_limit': total_limit, 'total_available': total_available, 'currency': 'AED'})
 
+    def _decrypt_pdf(self, pdf_bytes: bytes, password: str) -> bytes:
+        """Decrypt a password-protected PDF using pikepdf. Returns decrypted bytes."""
+        import io
+        try:
+            import pikepdf
+        except ImportError:
+            raise RuntimeError('pikepdf not installed')
+        with pikepdf.open(io.BytesIO(pdf_bytes), password=password) as pdf:
+            out = io.BytesIO()
+            pdf.save(out)
+            return out.getvalue()
+
     @action(detail=False, methods=['post'], url_path='parse-statement', url_name='parse-statement')
     def parse_statement(self, request):
         """Parse a bank statement PDF/image and extract card info + all transactions."""
@@ -783,6 +795,9 @@ class CardViewSet(viewsets.ModelViewSet):
 
         file_data = request.data.get('file')
         file_type = request.data.get('file_type', 'image/jpeg')
+        pdf_password = request.data.get('pdf_password', '')
+        save_password = request.data.get('save_password', False)
+        bank_name_hint = request.data.get('bank_name_hint', '')
 
         if not file_data:
             return Response({'error': 'file is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -808,6 +823,67 @@ class CardViewSet(viewsets.ModelViewSet):
 
         if len(decoded) > 25 * 1024 * 1024:
             return Response({'error': 'File too large. Maximum 25MB.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Handle PDF password decryption
+        if is_pdf:
+            try:
+                import pikepdf, io as _io
+                try:
+                    pikepdf.open(_io.BytesIO(decoded))
+                    # PDF opens without password — not encrypted
+                except pikepdf.PasswordError:
+                    # PDF is encrypted — need password
+                    passwords_to_try = []
+                    if pdf_password:
+                        passwords_to_try.append(pdf_password)
+                    # Auto-try saved passwords for this bank
+                    saved_pws = BankPassword.objects.filter(user=request.user)
+                    for bp in saved_pws:
+                        try:
+                            pw = encryption_service.decrypt(bytes(bp.password_encrypted))
+                            if pw and pw not in passwords_to_try:
+                                passwords_to_try.append(pw)
+                        except Exception:
+                            pass
+
+                    decrypted = None
+                    used_password = None
+                    detected_bank = None
+                    for pw in passwords_to_try:
+                        try:
+                            decrypted_bytes = self._decrypt_pdf(decoded, pw)
+                            decrypted = base64.b64encode(decrypted_bytes).decode('utf-8')
+                            used_password = pw
+                            # Find which bank this password belongs to
+                            for bp in saved_pws:
+                                try:
+                                    if encryption_service.decrypt(bytes(bp.password_encrypted)) == pw:
+                                        detected_bank = bp.bank_name
+                                        break
+                                except Exception:
+                                    pass
+                            break
+                        except Exception:
+                            continue
+
+                    if decrypted is None:
+                        if not passwords_to_try:
+                            return Response(
+                                {'error': 'pdf_password_required', 'message': 'هذا الملف محمي بكلمة سر. أدخل كلمة السر للمتابعة.'},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+                        return Response(
+                            {'error': 'pdf_password_wrong', 'message': 'كلمة السر غير صحيحة. حاول مرة أخرى.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    file_data = decrypted
+                    logger.info('Statement parse: PDF decrypted user=%s bank=%s', request.user.email, detected_bank or 'unknown')
+            except ImportError:
+                if pdf_password:
+                    return Response(
+                        {'error': 'pikepdf not available on this server.'},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE
+                    )
 
         anthropic_key = getattr(django_settings, 'ANTHROPIC_API_KEY', '')
         if not anthropic_key:
@@ -913,6 +989,19 @@ class CardViewSet(viewsets.ModelViewSet):
                 matched_card_id = str(existing.id)
                 matched_card_name = existing.card_name
 
+        # Save PDF password if requested
+        detected_bank_name = card_info.get('bank_name') or bank_name_hint
+        if save_password and pdf_password and detected_bank_name:
+            try:
+                BankPassword.objects.update_or_create(
+                    user=request.user,
+                    bank_name=detected_bank_name,
+                    defaults={'password_encrypted': encryption_service.encrypt(pdf_password)}
+                )
+                logger.info('Statement parse: saved password for bank=%s user=%s', detected_bank_name, request.user.email)
+            except Exception as e:
+                logger.warning('Statement parse: failed to save password: %s', str(e))
+
         logger.info('Statement parse done: user=%s bank=%s txns=%d matched_card=%s',
                     request.user.email, card_info.get('bank_name'), len(transactions_data), matched_card_id)
 
@@ -922,6 +1011,7 @@ class CardViewSet(viewsets.ModelViewSet):
             'transaction_count': len(transactions_data),
             'matched_card_id': matched_card_id,
             'matched_card_name': matched_card_name,
+            'password_saved': bool(save_password and pdf_password and detected_bank_name),
         })
 
     @action(detail=False, methods=['post'], url_path='import-statement', url_name='import-statement')
@@ -1059,6 +1149,39 @@ class CardViewSet(viewsets.ModelViewSet):
             'transactions_skipped': skipped_txns,
             'total_transactions': len(transactions_data),
         })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def bank_passwords_list(request):
+    """List all saved bank passwords for the user (names only, no actual passwords)."""
+    items = BankPassword.objects.filter(user=request.user).order_by('bank_name')
+    return Response([{'bank_name': bp.bank_name, 'id': str(bp.id), 'updated_at': bp.updated_at} for bp in items])
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def bank_passwords_save(request):
+    """Save or update a bank password."""
+    bank_name = request.data.get('bank_name', '').strip()
+    password = request.data.get('password', '').strip()
+    if not bank_name or not password:
+        return Response({'error': 'bank_name and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+    BankPassword.objects.update_or_create(
+        user=request.user, bank_name=bank_name,
+        defaults={'password_encrypted': encryption_service.encrypt(password)}
+    )
+    return Response({'status': 'saved', 'bank_name': bank_name})
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def bank_passwords_delete(request, bank_name):
+    """Delete a saved bank password."""
+    deleted, _ = BankPassword.objects.filter(user=request.user, bank_name=bank_name).delete()
+    if deleted:
+        return Response({'status': 'deleted'})
+    return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class TransactionViewSet(viewsets.ModelViewSet):
