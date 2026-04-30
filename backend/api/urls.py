@@ -9,6 +9,7 @@ from .views import (
     webauthn_list_credentials, webauthn_delete_credential,
     realtime_session,
     bank_passwords_list, bank_passwords_save, bank_passwords_delete,
+    statements_list, statement_transactions,
 )
 
 router = DefaultRouter()
@@ -42,5 +43,7 @@ urlpatterns = [
     path('bank-passwords/', bank_passwords_list, name='bank-passwords-list'),
     path('bank-passwords/save/', bank_passwords_save, name='bank-passwords-save'),
     path('bank-passwords/<str:bank_name>/', bank_passwords_delete, name='bank-passwords-delete'),
+    path('statements/', statements_list, name='statements-list'),
+    path('statements/<str:statement_id>/transactions/', statement_transactions, name='statement-transactions'),
     path('', include(router.urls)),
 ]

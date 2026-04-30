@@ -169,6 +169,7 @@ class Transaction(models.Model):
     category = models.CharField(max_length=100, null=True, blank=True)
     transaction_date = models.DateTimeField()
     source = models.CharField(max_length=50, default='manual')
+    statement = models.ForeignKey('Statement', on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions')
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -183,6 +184,34 @@ class Transaction(models.Model):
             models.Index(fields=['card_id']),
             models.Index(fields=['transaction_date']),
         ]
+
+
+class Statement(models.Model):
+    """Stores metadata for each imported bank statement."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='statements')
+    card = models.ForeignKey('Card', on_delete=models.SET_NULL, null=True, blank=True, related_name='statements')
+    bank_name = models.CharField(max_length=100)
+    card_name = models.CharField(max_length=255, null=True, blank=True)
+    card_last_four = models.CharField(max_length=4, null=True, blank=True)
+    cardholder_name = models.CharField(max_length=255, null=True, blank=True)
+    statement_period_from = models.DateField(null=True, blank=True)
+    statement_period_to = models.DateField(null=True, blank=True)
+    statement_balance = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    available_balance = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    credit_limit = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    payment_due_full_date = models.DateField(null=True, blank=True)
+    payment_due_day = models.IntegerField(null=True, blank=True)
+    minimum_payment = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=3, default='AED')
+    transactions_imported = models.IntegerField(default=0)
+    transactions_skipped = models.IntegerField(default=0)
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'statements'
+        ordering = ['-imported_at']
+        indexes = [models.Index(fields=['user_id']), models.Index(fields=['card_id'])]
 
 
 class CashEntry(models.Model):

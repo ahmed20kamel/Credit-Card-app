@@ -121,6 +121,27 @@ export const cardsAPI = {
     return response.data;
   },
 
+  listStatements: async (): Promise<Array<{
+    id: string; bank_name: string; card_name: string | null; card_last_four: string | null;
+    cardholder_name: string | null; statement_period_from: string | null; statement_period_to: string | null;
+    statement_balance: number | null; available_balance: number | null; credit_limit: number | null;
+    payment_due_full_date: string | null; payment_due_day: number | null; minimum_payment: number | null;
+    currency: string; transactions_imported: number; transactions_skipped: number;
+    imported_at: string; card_id: string | null; card_color: string | null;
+  }>> => {
+    const response = await api.get('/statements/');
+    return response.data;
+  },
+
+  getStatementTransactions: async (statementId: string): Promise<{
+    statement_id: string;
+    count: number;
+    transactions: Array<{ id: string; date: string; merchant: string | null; amount: number; type: string; currency: string; category: string | null }>;
+  }> => {
+    const response = await api.get(`/statements/${statementId}/transactions/`);
+    return response.data;
+  },
+
   updatePointsRate: async (cardId: string, points_earn_rate: number, points_value_fils: number): Promise<void> => {
     await api.patch(`/cards/${cardId}`, { points_earn_rate, points_value_fils });
   },

@@ -1215,6 +1215,8 @@ class CardViewSet(viewsets.ModelViewSet):
         import logging
         logger = logging.getLogger('api.audit')
 
+        from .models import Statement as _Statement
+
         card_info = request.data.get('card_info', {})
         transactions_data = request.data.get('transactions', [])
         card_id = request.data.get('card_id')
@@ -1283,6 +1285,34 @@ class CardViewSet(viewsets.ModelViewSet):
             if update_fields:
                 card.save(update_fields=update_fields + ['updated_at'])
 
+        # Create Statement record
+        def _parse_date(s):
+            if not s:
+                return None
+            try:
+                from datetime import datetime as _dt
+                return _dt.strptime(s[:10], '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return None
+
+        stmt_obj = _Statement.objects.create(
+            user=request.user,
+            card=card,
+            bank_name=card_info.get('bank_name', ''),
+            card_name=card_info.get('card_name'),
+            card_last_four=card_info.get('card_last_four'),
+            cardholder_name=card_info.get('cardholder_name'),
+            statement_period_from=_parse_date(card_info.get('statement_period_from')),
+            statement_period_to=_parse_date(card_info.get('statement_period_to')),
+            statement_balance=card_info.get('statement_balance'),
+            available_balance=card_info.get('available_balance'),
+            credit_limit=card_info.get('credit_limit'),
+            payment_due_full_date=_parse_date(card_info.get('payment_due_full_date')),
+            payment_due_day=card_info.get('payment_due_date'),
+            minimum_payment=card_info.get('minimum_payment'),
+            currency=card_info.get('currency', 'AED'),
+        )
+
         # Bulk create transactions
         VALID_TYPES = {'purchase', 'payment', 'refund', 'withdrawal', 'transfer', 'deposit'}
         created_txns = 0
@@ -1322,17 +1352,23 @@ class CardViewSet(viewsets.ModelViewSet):
                     currency=currency, merchant_name=merchant or None,
                     category=txn_data.get('category') or None,
                     transaction_date=txn_date, source='statement_import',
+                    statement=stmt_obj,
                 )
                 created_txns += 1
             except Exception as e:
                 logger.warning('Statement import txn error: %s', str(e))
                 continue
 
+        # Update statement with final counts
+        stmt_obj.transactions_imported = created_txns
+        stmt_obj.transactions_skipped = skipped_txns
+        stmt_obj.save(update_fields=['transactions_imported', 'transactions_skipped'])
+
         if card and card.card_type == 'credit':
             update_card_balance(card)
 
-        logger.info('Statement import done: user=%s card=%s created=%d skipped=%d',
-                    request.user.email, card.id if card else None, created_txns, skipped_txns)
+        logger.info('Statement import done: user=%s card=%s created=%d skipped=%d stmt=%s',
+                    request.user.email, card.id if card else None, created_txns, skipped_txns, stmt_obj.id)
 
         from .serializers import CardSerializer as _CS
         return Response({
@@ -1341,7 +1377,63 @@ class CardViewSet(viewsets.ModelViewSet):
             'transactions_created': created_txns,
             'transactions_skipped': skipped_txns,
             'total_transactions': len(transactions_data),
+            'statement_id': str(stmt_obj.id),
         })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def statements_list(request):
+    """List all imported statements with summary, newest first."""
+    from .models import Statement as _Statement
+    stmts = _Statement.objects.filter(user=request.user).select_related('card').order_by('-imported_at')
+    result = []
+    for s in stmts:
+        result.append({
+            'id': str(s.id),
+            'bank_name': s.bank_name,
+            'card_name': s.card_name,
+            'card_last_four': s.card_last_four,
+            'cardholder_name': s.cardholder_name,
+            'statement_period_from': s.statement_period_from.isoformat() if s.statement_period_from else None,
+            'statement_period_to': s.statement_period_to.isoformat() if s.statement_period_to else None,
+            'statement_balance': float(s.statement_balance) if s.statement_balance else None,
+            'available_balance': float(s.available_balance) if s.available_balance else None,
+            'credit_limit': float(s.credit_limit) if s.credit_limit else None,
+            'payment_due_full_date': s.payment_due_full_date.isoformat() if s.payment_due_full_date else None,
+            'payment_due_day': s.payment_due_day,
+            'minimum_payment': float(s.minimum_payment) if s.minimum_payment else None,
+            'currency': s.currency,
+            'transactions_imported': s.transactions_imported,
+            'transactions_skipped': s.transactions_skipped,
+            'imported_at': s.imported_at.isoformat(),
+            'card_id': str(s.card.id) if s.card else None,
+            'card_color': s.card.color_hex if s.card else None,
+        })
+    return Response(result)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def statement_transactions(request, statement_id):
+    """List all transactions belonging to a specific statement."""
+    from .models import Statement as _Statement
+    try:
+        stmt = _Statement.objects.get(id=statement_id, user=request.user)
+    except _Statement.DoesNotExist:
+        from rest_framework.response import Response as _R
+        return _R({'error': 'Not found'}, status=404)
+    txns = stmt.transactions.filter(is_deleted=False).order_by('-transaction_date')
+    result = [{
+        'id': str(t.id),
+        'date': t.transaction_date.strftime('%Y-%m-%d') if t.transaction_date else None,
+        'merchant': t.merchant_name,
+        'amount': float(t.amount),
+        'type': t.transaction_type,
+        'currency': t.currency,
+        'category': t.category,
+    } for t in txns]
+    return Response({'statement_id': statement_id, 'transactions': result, 'count': len(result)})
 
 
 @api_view(['GET'])
@@ -1823,6 +1915,23 @@ def chat_send(request):
     cash_out = cash_qs.filter(entry_type='expense').aggregate(s=Sum('amount'))['s'] or 0
     cash_balance = float(cash_in - cash_out)
 
+    # Imported statements (last 20)
+    from .models import Statement as _Statement
+    stmts_qs = _Statement.objects.filter(user=request.user).select_related('card').order_by('-imported_at')[:20]
+    statements_context = [{
+        'bank': s.bank_name,
+        'card': s.card_name,
+        'last_four': s.card_last_four,
+        'period': f"{s.statement_period_from} → {s.statement_period_to}" if s.statement_period_from else None,
+        'statement_balance': float(s.statement_balance) if s.statement_balance else None,
+        'available': float(s.available_balance) if s.available_balance else None,
+        'credit_limit': float(s.credit_limit) if s.credit_limit else None,
+        'due_date': s.payment_due_full_date.isoformat() if s.payment_due_full_date else None,
+        'min_payment': float(s.minimum_payment) if s.minimum_payment else None,
+        'txns_imported': s.transactions_imported,
+        'imported_at': s.imported_at.strftime('%Y-%m-%d'),
+    } for s in stmts_qs]
+
     # Previous messages for context (last 20)
     prev_msgs = list(ChatMessage.objects.filter(session=session).order_by('-created_at')[:21])
     conversation = [{'role': m.role, 'content': m.content} for m in reversed(prev_msgs) if not (m.role == 'user' and m.content == user_message)]
@@ -1845,6 +1954,9 @@ def chat_send(request):
 ## ALL Transactions Summary ({total_count} total transactions in database):
 - Top categories (all time): {json.dumps([{'category': r['category'] or 'Other', 'total': float(r['total']), 'count': r['cnt']} for r in category_totals], default=str)}
 - Monthly trend (last 6 months): {json.dumps(sorted(monthly_map.values(), key=lambda x: x['month']), default=str)}
+
+## Imported Statements ({len(statements_context)} statements on record):
+{json.dumps(statements_context, ensure_ascii=False, default=str)}
 
 ## ALL {total_count} Transactions (format: date|type|amount|currency|merchant|card|last4|category):
 {chr(10).join(txn_context)}
