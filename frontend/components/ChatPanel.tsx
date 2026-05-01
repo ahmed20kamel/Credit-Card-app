@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useChatStore } from '@/app/store/chatStore';
 import { cardsAPI } from '@/app/api/cards';
 import { useTranslations } from '@/lib/i18n';
@@ -366,7 +368,15 @@ export default function ChatPanel() {
                     {msg.role === 'user' ? <UserIcon size={16} /> : <Bot size={16} />}
                   </div>
                   <div className="chat-msg-bubble">
-                    <span className="chat-msg-text">{msg.content}</span>
+                    {msg.role === 'assistant' ? (
+                      <div className="chat-md">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <span className="chat-msg-text">{msg.content}</span>
+                    )}
                     {msg.role === 'assistant' && ttsSupported && (
                       <button
                         className={`chat-msg-speak-btn ${isSpeaking ? 'speaking' : ''}`}
