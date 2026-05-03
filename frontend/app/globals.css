@@ -3359,7 +3359,8 @@ html[dir="rtl"] .credit-card-error {
 }
 
 .transaction-badge[data-type="refund"],
-.transaction-badge[data-type="transfer"] {
+.transaction-badge[data-type="transfer"],
+.transaction-badge[data-type="deposit"] {
   background: rgba(16, 185, 129, 0.1);
   color: var(--success);
 }
@@ -3386,7 +3387,8 @@ html[dir="rtl"] .credit-card-error {
 }
 
 .transaction-amount[data-type="refund"],
-.transaction-amount[data-type="transfer"] {
+.transaction-amount[data-type="transfer"],
+.transaction-amount[data-type="deposit"] {
   color: var(--success);
 }
 

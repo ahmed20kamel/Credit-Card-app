@@ -132,7 +132,7 @@ export interface CardUpdateRequest {
 }
 
 // ========== Transaction Types ==========
-export type TransactionType = 'purchase' | 'withdrawal' | 'payment' | 'refund' | 'transfer';
+export type TransactionType = 'purchase' | 'withdrawal' | 'payment' | 'refund' | 'transfer' | 'deposit';
 
 export interface Transaction {
   id: string;
