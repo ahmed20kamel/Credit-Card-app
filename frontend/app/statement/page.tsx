@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
-import { cardsAPI } from '@/app/api/cards';
+import { cardsAPI, type Card } from '@/app/api/cards';
 import { useTranslations } from '@/lib/i18n';
 import { formatAmount } from '@/lib/formatNumber';
 import CurrencySymbol from '@/components/ui/CurrencySymbol';
@@ -47,6 +47,7 @@ type FileEntry = {
   transactions?: ParsedTxn[];
   matchedCardId?: string;
   matchedCardName?: string;
+  selectedCardId?: string;
   passwordRequired?: boolean;
   password?: string;
   savePassword?: boolean;
@@ -86,11 +87,15 @@ export default function StatementPage() {
   const [newBankPassword, setNewBankPassword] = useState('');
   const [showPwInput, setShowPwInput] = useState<Record<string, boolean>>({});
 
+  // Existing cards (for card picker)
+  const [existingCards, setExistingCards] = useState<Card[]>([]);
+
   // Keep ref in sync so processAll always reads latest file state (avoids stale closure)
   filesRef.current = files;
 
   useEffect(() => {
     cardsAPI.getBankPasswords().then(setSavedPasswords).catch(() => {});
+    cardsAPI.list().then(res => setExistingCards(res.items ?? [])).catch(() => {});
   }, []);
 
   // ── File selection ─────────────────────────────────────────────────────
@@ -239,7 +244,8 @@ export default function StatementPage() {
       const fi = txn._fileIndex ?? 0;
       if (!byFile.has(fi)) {
         const fileEntry = files[fi];
-        byFile.set(fi, { cardInfo: fileEntry?.cardInfo || {}, txns: [], cardId: fileEntry?.matchedCardId });
+        const resolvedCardId = fileEntry?.selectedCardId || fileEntry?.matchedCardId;
+        byFile.set(fi, { cardInfo: fileEntry?.cardInfo || {}, txns: [], cardId: resolvedCardId });
       }
       byFile.get(fi)!.txns.push(txn);
     }
@@ -457,6 +463,34 @@ export default function StatementPage() {
                       <button onClick={() => removeFile(entry.id)} className="btn btn-secondary btn-icon-only" style={{ flexShrink: 0 }}><X size={14} /></button>
                     )}
                   </div>
+
+                  {/* Card picker: shown after parse when no auto-match */}
+                  {entry.status === 'done' && !entry.matchedCardId && existingCards.length > 0 && (
+                    <div style={{ marginTop: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap', padding: 'var(--space-2) var(--space-3)', background: 'rgba(245,158,11,0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                      <CreditCard size={14} color="var(--warning)" style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.78rem', color: 'var(--warning)', fontWeight: 600, whiteSpace: 'nowrap' }}>ربط بكارت:</span>
+                      <select
+                        value={entry.selectedCardId || ''}
+                        onChange={e => setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, selectedCardId: e.target.value || undefined } : f))}
+                        style={{ flex: '1 1 200px', fontSize: '0.82rem', padding: '4px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                      >
+                        <option value="">إنشاء كارت جديد تلقائياً</option>
+                        {existingCards.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.card_name} {c.card_last_four ? `•••• ${c.card_last_four}` : ''} — {c.bank_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Auto-match badge */}
+                  {entry.status === 'done' && entry.matchedCardId && (
+                    <div style={{ marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--success)' }}>
+                      <CheckCircle size={13} />
+                      <span>تم ربطه تلقائياً بـ <strong>{entry.matchedCardName}</strong></span>
+                    </div>
+                  )}
 
                   {/* Password input for protected files */}
                   {entry.status === 'password_required' && (
