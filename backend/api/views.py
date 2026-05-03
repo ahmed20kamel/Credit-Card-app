@@ -1229,11 +1229,34 @@ class CardViewSet(viewsets.ModelViewSet):
             except Card.DoesNotExist:
                 pass
 
+        # Match by last_four (exact)
         if not card and card_info.get('card_last_four'):
             card = Card.objects.filter(
                 user=request.user,
                 card_last_four=card_info['card_last_four']
             ).first()
+
+        # Fallback: match by bank_name + card_name similarity (handles card renewal / number change)
+        if not card and card_info.get('bank_name'):
+            bank = card_info['bank_name'].strip()
+            cname = (card_info.get('card_name') or '').strip().lower()
+            qs = Card.objects.filter(user=request.user, is_deleted=False, bank_name__icontains=bank[:20])
+            if cname:
+                matched = qs.filter(card_name__icontains=cname[:20]).first()
+                if not matched:
+                    matched = qs.first()
+            else:
+                matched = qs.first()
+            if matched:
+                card = matched
+                # Card was renewed — update the last_four to the new number
+                if card_info.get('card_last_four') and card.card_last_four != card_info['card_last_four']:
+                    from .services import encryption_service as _enc
+                    new_last4 = card_info['card_last_four']
+                    card.card_last_four = new_last4
+                    placeholder = '000000000000' + new_last4
+                    card.card_number_encrypted = _enc.encrypt(placeholder)
+                    card.save(update_fields=['card_last_four', 'card_number_encrypted'])
 
         created_card = False
         if not card:
@@ -2025,12 +2048,23 @@ When user says two cards are the same card (replacement, same account), merge al
 - Then soft-deletes the source card
 - Use this when user says card was replaced/renewed
 
+### CLEAR ALL DATA
+When user asks to clear / reset / delete ALL transactions and statements (start fresh). Requires explicit confirmation word (صفّر / امسح كل شيء / clear all / reset data):
+[ACTION:CLEAR_ALL_DATA]
+{{"clear_transactions": true, "clear_statements": true, "clear_cards": false}}
+[/ACTION]
+- clear_transactions: deletes ALL transactions for the user
+- clear_statements: deletes ALL imported statements for the user
+- clear_cards: set true ONLY if user explicitly asks to delete cards too (default false)
+- ALWAYS mention how many records were deleted in your response
+
 Rules:
 - You CAN and SHOULD perform these actions when asked
 - Always confirm what you did in your message text above the action block
 - NEVER say you can't edit/delete/merge cards - you CAN using the action blocks above
 - You can include multiple action blocks in one response if needed
-- When merging cards, always confirm which is old and which is new before acting"""
+- When merging cards, always confirm which is old and which is new before acting
+- For CLEAR_ALL_DATA: ask for confirmation ONCE if user hasn't said a clear confirmation word, then act"""
 
     ai_response = None
     google_key = getattr(django_settings, 'GOOGLE_API_KEY', '')
@@ -2291,6 +2325,31 @@ Rules:
                 })
             except Exception as e:
                 logger.warning('Chat MERGE_CARDS error: %s', str(e))
+
+    # Process CLEAR_ALL_DATA actions
+    if '[ACTION:CLEAR_ALL_DATA]' in ai_response:
+        action_pattern = r'\[ACTION:CLEAR_ALL_DATA\]\s*(\{.*?\})\s*\[/ACTION\]'
+        for match in re.finditer(action_pattern, ai_response, re.DOTALL):
+            try:
+                data = json.loads(match.group(1))
+                deleted_txns = deleted_stmts = deleted_cards = 0
+                if data.get('clear_transactions', True):
+                    deleted_txns, _ = Transaction.objects.filter(user=request.user).delete()
+                if data.get('clear_statements', True):
+                    from .models import Statement as _Stmt
+                    deleted_stmts, _ = _Stmt.objects.filter(user=request.user).delete()
+                if data.get('clear_cards', False):
+                    deleted_cards = Card.objects.filter(user=request.user).update(is_deleted=True)
+                actions_performed.append({
+                    'type': 'data_cleared',
+                    'transactions_deleted': deleted_txns,
+                    'statements_deleted': deleted_stmts,
+                    'cards_deleted': deleted_cards,
+                })
+                logger.info('CLEAR_ALL_DATA: user=%s txns=%d stmts=%d cards=%d',
+                            request.user.email, deleted_txns, deleted_stmts, deleted_cards)
+            except Exception as e:
+                logger.warning('Chat CLEAR_ALL_DATA error: %s', str(e))
 
     # Strip all action blocks from the display response
     display_response = re.sub(r'\[ACTION:[A-Z_]+\].*?\[/ACTION\]', '', ai_response, flags=re.DOTALL).strip()

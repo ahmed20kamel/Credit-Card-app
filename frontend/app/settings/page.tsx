@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import { useTranslations } from '@/lib/i18n';
 import { useAuthStore } from '@/app/store/authStore';
 import { authAPI } from '@/app/api/auth';
+import api from '@/app/api/client';
 import { getErrorMessage } from '@/lib/errors';
 import { getTheme, setTheme, type Theme } from '@/lib/theme';
 import toast from 'react-hot-toast';
@@ -25,6 +26,7 @@ import {
   Save,
   Fingerprint,
   Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import PasswordStrength from '@/components/ui/PasswordStrength';
 
@@ -486,7 +488,85 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+
+        {/* ── Danger Zone ── */}
+        <DangerZone />
+
       </div>
     </Layout>
+  );
+}
+
+function DangerZone() {
+  const [confirm, setConfirm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState<{ txns: number; stmts: number } | null>(null);
+  const MAGIC = 'امسح كل شيء';
+
+  const handleClear = async () => {
+    if (confirm !== MAGIC) return;
+    setLoading(true);
+    try {
+      const res = await api.post('/chat/send/', {
+        message: 'صفّر كل البيانات — امسح كل المعاملات والكشوفات',
+      });
+      const actions: Array<Record<string, number>> = res.data?.actions ?? [];
+      const cleared = actions.find((a) => a.type === 'data_cleared');
+      setDone({
+        txns: cleared?.transactions_deleted ?? 0,
+        stmts: cleared?.statements_deleted ?? 0,
+      });
+      toast.success('تم مسح كل البيانات');
+    } catch {
+      toast.error('فشل المسح — حاول مجدداً');
+    } finally {
+      setLoading(false);
+      setConfirm('');
+    }
+  };
+
+  return (
+    <div className="settings-section" style={{ borderColor: 'var(--danger)', marginTop: 'var(--space-6)' }}>
+      <div className="settings-section-header" style={{ color: 'var(--danger)' }}>
+        <AlertTriangle size={18} />
+        <h2 className="settings-section-title" style={{ color: 'var(--danger)' }}>منطقة الخطر</h2>
+      </div>
+      <div className="settings-section-content">
+        {done ? (
+          <div style={{ padding: 'var(--space-4)', background: 'var(--danger-bg)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+            <p style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: 4 }}>تم المسح بنجاح</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              {done.txns} معاملة · {done.stmts} كشف
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0 }}>
+              يحذف <strong>كل المعاملات والكشوفات</strong> بشكل نهائي. الكروت تفضل موجودة. لا يمكن التراجع.
+            </p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>
+              اكتب <strong style={{ color: 'var(--danger)' }}>{MAGIC}</strong> للتأكيد:
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <input
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                placeholder={MAGIC}
+                style={{ flex: 1 }}
+              />
+              <button
+                onClick={handleClear}
+                disabled={confirm !== MAGIC || loading}
+                className="btn"
+                style={{ background: 'var(--danger)', color: '#fff', whiteSpace: 'nowrap', opacity: confirm !== MAGIC ? 0.4 : 1 }}
+              >
+                {loading ? <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> : <Trash2 size={15} />}
+                مسح كل شيء
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
