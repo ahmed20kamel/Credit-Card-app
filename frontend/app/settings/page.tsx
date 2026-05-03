@@ -510,11 +510,11 @@ function DangerZone() {
       const res = await api.post('/chat/send/', {
         message: 'صفّر كل البيانات — امسح كل المعاملات والكشوفات',
       });
-      const actions: Array<Record<string, number>> = res.data?.actions ?? [];
+      const actions: Array<Record<string, unknown>> = res.data?.actions ?? [];
       const cleared = actions.find((a) => a.type === 'data_cleared');
       setDone({
-        txns: cleared?.transactions_deleted ?? 0,
-        stmts: cleared?.statements_deleted ?? 0,
+        txns: (cleared?.transactions_deleted as number) ?? 0,
+        stmts: (cleared?.statements_deleted as number) ?? 0,
       });
       toast.success('تم مسح كل البيانات');
     } catch {
