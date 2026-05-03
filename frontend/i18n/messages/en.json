@@ -72,6 +72,8 @@
     "smsParser": "SMS Parser",
     "logout": "Logout",
     "statement": "Bank Statement",
+    "reports": "Reports",
+    "statementHistory": "Statement History",
     "cash": "Cash",
     "settings": "Settings"
   },

@@ -35,8 +35,8 @@ export default function Sidebar({ userEmail, onLogout }: SidebarProps) {
     { href: '/transactions', label: t('navigation.transactions'), icon: Receipt, key: 'transactions' },
     { href: '/sms-parser', label: t('navigation.addTransaction'), icon: Upload, key: 'addTransaction' },
     { href: '/statement', label: t('navigation.statement') || 'كشف الحساب', icon: FileText, key: 'statement' },
-    { href: '/reports', label: 'التقارير', icon: BarChart3, key: 'reports' },
-    { href: '/statements', label: 'سجل الكشوفات', icon: History, key: 'statements' },
+    { href: '/reports', label: t('navigation.reports'), icon: BarChart3, key: 'reports' },
+    { href: '/statements', label: t('navigation.statementHistory'), icon: History, key: 'statements' },
     { href: '/cash', label: t('navigation.cash') || 'Cash', icon: Banknote, key: 'cash' },
     { href: '/settings', label: t('common.settings') || 'Settings', icon: Settings, key: 'settings' },
   ];

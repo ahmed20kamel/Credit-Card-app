@@ -72,6 +72,8 @@
     "smsParser": "تحليل الرسائل",
     "logout": "تسجيل الخروج",
     "statement": "كشف الحساب",
+    "reports": "التقارير",
+    "statementHistory": "سجل الكشوفات",
     "cash": "النقد",
     "settings": "الإعدادات"
   },
