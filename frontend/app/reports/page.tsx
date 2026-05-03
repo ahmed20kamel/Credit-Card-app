@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
+import { useTranslations } from '@/lib/i18n';
 import { cardsAPI } from '@/app/api/cards';
 import { formatAmount } from '@/lib/formatNumber';
 import CurrencySymbol from '@/components/ui/CurrencySymbol';
@@ -16,19 +17,27 @@ import {
 
 type Analytics = Awaited<ReturnType<typeof cardsAPI.analytics>>;
 
-const PERIOD_LABELS: Record<string, string> = {
-  month: 'هذا الشهر', quarter: 'هذا الربع', year: 'هذه السنة', all: 'كل الوقت', custom: 'نطاق مخصص',
-};
-
 const AR_MONTHS: Record<string, string> = {
   '01': 'يناير', '02': 'فبراير', '03': 'مارس', '04': 'أبريل',
   '05': 'مايو', '06': 'يونيو', '07': 'يوليو', '08': 'أغسطس',
   '09': 'سبتمبر', '10': 'أكتوبر', '11': 'نوفمبر', '12': 'ديسمبر',
 };
+const EN_MONTHS: Record<string, string> = {
+  '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
+  '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
+  '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec',
+};
 
-function fmtDate(iso: string) {
+function getPeriodLabels(locale: string): Record<string, string> {
+  return locale === 'ar'
+    ? { month: 'هذا الشهر', quarter: 'هذا الربع', year: 'هذه السنة', all: 'كل الوقت', custom: 'نطاق مخصص' }
+    : { month: 'This Month', quarter: 'This Quarter', year: 'This Year', all: 'All Time', custom: 'Custom Range' };
+}
+
+function fmtDate(iso: string, locale: string) {
   const [y, m, d] = iso.split('-');
-  return `${d} ${AR_MONTHS[m]} ${y}`;
+  const month = locale === 'ar' ? AR_MONTHS[m] : EN_MONTHS[m];
+  return `${d} ${month} ${y}`;
 }
 
 function urgencyColor(days: number | null) {
@@ -50,6 +59,8 @@ function MiniBar({ value, max, color }: { value: number; max: number; color: str
 
 export default function ReportsPage() {
   const router = useRouter();
+  const { locale } = useTranslations();
+  const PERIOD_LABELS = getPeriodLabels(locale);
 
   // Filter state
   const [period, setPeriod] = useState<'month' | 'quarter' | 'year' | 'all' | 'custom'>('all');
@@ -153,7 +164,7 @@ export default function ReportsPage() {
   const minDue = upcoming_payments.reduce((s, c) => s + c.minimum_payment, 0);
 
   const periodLabel = period === 'custom' && (fromDate || toDate)
-    ? `${fromDate ? fmtDate(fromDate) : '…'} — ${toDate ? fmtDate(toDate) : '…'}`
+    ? `${fromDate ? fmtDate(fromDate, locale) : '…'} — ${toDate ? fmtDate(toDate, locale) : '…'}`
     : PERIOD_LABELS[period];
 
   return (
@@ -322,12 +333,16 @@ export default function ReportsPage() {
                         {card.due_date ? (
                           <>
                             <p style={{ fontWeight: 600, color: dColor, margin: '0 0 2px', fontSize: '0.85rem' }}>
-                              {card.is_overdue ? '⚠️ متأخر' : card.days_until === 0 ? '⚡ اليوم' : `${card.days_until} يوم`}
+                              {card.is_overdue
+                                ? (locale === 'ar' ? '⚠️ متأخر' : '⚠️ Overdue')
+                                : card.days_until === 0
+                                  ? (locale === 'ar' ? '⚡ اليوم' : '⚡ Today')
+                                  : `${card.days_until} ${locale === 'ar' ? 'يوم' : 'days'}`}
                             </p>
-                            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>{fmtDate(card.due_date)}</p>
+                            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>{fmtDate(card.due_date, locale)}</p>
                           </>
                         ) : (
-                          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>تاريخ غير محدد</p>
+                          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>{locale === 'ar' ? 'تاريخ غير محدد' : 'No date set'}</p>
                         )}
                       </div>
                     </div>

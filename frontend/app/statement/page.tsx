@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { cardsAPI, type Card } from '@/app/api/cards';
 import { useTranslations } from '@/lib/i18n';
@@ -63,6 +63,8 @@ const uid = () => Math.random().toString(36).slice(2);
 // ── Component ──────────────────────────────────────────────────────────────
 export default function StatementPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedCardId = searchParams.get('card_id') ?? undefined;
   const { isRTL } = useTranslations();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -193,6 +195,8 @@ export default function StatementPage() {
           transactions: txns,
           matchedCardId: result.matched_card_id,
           matchedCardName: result.matched_card_name,
+          // Pre-select card from URL param if no auto-match
+          selectedCardId: result.matched_card_id ? undefined : preselectedCardId,
         } : f));
 
       } catch (err: unknown) {

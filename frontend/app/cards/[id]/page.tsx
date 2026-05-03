@@ -25,7 +25,8 @@ import {
   Copy,
   Check,
   Star,
-  CheckCircle
+  CheckCircle,
+  Upload,
 } from 'lucide-react';
 import { extractCardId, getCardUrl } from '@/lib/utils';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -490,6 +491,13 @@ export default function CardDetailPage() {
               >
                 <Receipt size={16} />
                 {t('cards.viewAllTransactions')}
+              </button>
+              <button
+                onClick={() => router.push(`/statement?card_id=${card.id}`)}
+                className="btn btn-secondary btn-full"
+              >
+                <Upload size={16} />
+                {t('cards.uploadStatement') || 'رفع كشف حساب'}
               </button>
               <button
                 onClick={handleDelete}
