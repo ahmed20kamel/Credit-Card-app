@@ -21,7 +21,7 @@ export default function ChatPanel() {
   const [input, setInput] = useState('');
   const [showSessions, setShowSessions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Voice input (STT)
   const [isRecording, setIsRecording] = useState(false);
@@ -224,11 +224,17 @@ export default function ChatPanel() {
   const removeImagePreview = useCallback(() => { setImagePreview(null); setAttachedFile(null); }, []);
 
   // ── Send ──────────────────────────────────────────────────────────────
+  const autoResize = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+  };
+
   const handleSend = async () => {
     if ((!input.trim() && !imagePreview && !attachedFile) || isSending) return;
     const text = input.trim() || (imagePreview ? (t('chat.imageAttached') || 'Image attached') : attachedFile ? `مرفق: ${attachedFile.name}` : '');
     sendMessage(text, imagePreview || undefined);
     setInput('');
+    if (inputRef.current) { inputRef.current.style.height = 'auto'; }
     const fileToExtract = attachedFile;
     setImagePreview(null);
     setAttachedFile(null);
@@ -430,7 +436,7 @@ export default function ChatPanel() {
           )}
 
           {/* ── Input Area ── */}
-          <div className={`chat-input-area ${voiceMode ? 'voice-mode' : ''}`}>
+          <div className={`chat-input-area ${voiceMode ? 'voice-mode' : ''}`} style={{ position: 'relative' }}>
             <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleFileChange} style={{ display: 'none' }} />
 
             {voiceMode ? (
@@ -458,6 +464,16 @@ export default function ChatPanel() {
             ) : (
               /* ── Normal Mode: Text input + extras ── */
               <>
+                {/* Recording active bar */}
+                {isRecording && (
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '6px 12px', background: 'var(--danger)', zIndex: 10, borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0' }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', animation: 'pulse 1s infinite' }} />
+                    <span style={{ fontSize: '0.78rem', color: '#fff', fontWeight: 600 }}>{ar('جاري التسجيل... اضغط للإيقاف', 'Recording... tap to stop')}</span>
+                    <button onClick={toggleRecording} type="button" style={{ background: 'rgba(255,255,255,0.25)', border: 'none', borderRadius: 6, padding: '2px 8px', color: '#fff', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>
+                      {ar('إيقاف', 'Stop')}
+                    </button>
+                  </div>
+                )}
                 <div className="chat-input-extras">
                   <button
                     onClick={handleImageSelect}
@@ -480,14 +496,16 @@ export default function ChatPanel() {
                     </button>
                   )}
                 </div>
-                <input
+                <textarea
                   ref={inputRef}
                   value={input}
-                  onChange={e => setInput(e.target.value)}
+                  rows={1}
+                  onChange={e => { setInput(e.target.value); autoResize(e.target); }}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                   placeholder={t('chat.placeholder') || 'Ask about your finances...'}
                   className="chat-input"
                   disabled={isSending}
+                  style={{ resize: 'none', overflowY: 'hidden', lineHeight: '1.45' }}
                 />
                 <button
                   onClick={handleSend}

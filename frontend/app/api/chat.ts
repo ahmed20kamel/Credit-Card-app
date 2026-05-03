@@ -28,7 +28,7 @@ export const chatAPI = {
   },
   getMessages: async (sessionId: string): Promise<ChatMessage[]> => {
     const res = await api.get('/chat/messages', { params: { session_id: sessionId } });
-    return Array.isArray(res.data) ? res.data : res.data.items || [];
+    return Array.isArray(res.data) ? res.data : (res.data.results ?? res.data.items ?? []);
   },
   deleteSession: async (sessionId: string): Promise<void> => {
     await api.delete(`/chat/sessions/${sessionId}`);

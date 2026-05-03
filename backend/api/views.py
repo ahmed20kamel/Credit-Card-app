@@ -1743,11 +1743,14 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
 class ChatMessageViewSet(viewsets.ModelViewSet):
     serializer_class = ChatMessageSerializer
     permission_classes = [IsAuthenticated]
-    
+    pagination_class = None
+
     def get_queryset(self):
         session_id = self.request.query_params.get('session_id')
         if session_id:
-            return ChatMessage.objects.filter(session_id=session_id, session__user=self.request.user)
+            return ChatMessage.objects.filter(
+                session_id=session_id, session__user=self.request.user
+            ).order_by('created_at')
         return ChatMessage.objects.none()
     
     def perform_create(self, serializer):
